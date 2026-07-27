@@ -4,16 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>商圈數位集點系統</title>
+    
+    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 載入 Babel (瀏覽器端編譯 JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 【重點】載入 LINE LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
     <style>
         body { background-color: #f8fafc; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
         .app-container { max-width: 400px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,0.05); position: relative; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         /* 淺色薄荷綠與水藍漸層 */
         .bg-gradient-primary { background: linear-gradient(135deg, #ccfbf1 0%, #e0f2fe 100%); }
+        /* 動畫設定 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
 </head>
 <body>
@@ -41,27 +51,76 @@
             const [activeShop, setActiveShop] = useState(mockShops[0]);
             const [customerPoints, setCustomerPoints] = useState({ food: 2, souvenir: 1, stay: 0 }); 
             const [logs, setLogs] = useState([]); 
+            
+            // LINE 狀態管理
+            const [isLiffInit, setIsLiffInit] = useState(false);
+            const [userProfile, setUserProfile] = useState(null);
+
+            useEffect(() => {
+                // 啟動 LINE LIFF 引擎
+                const initLiff = async () => {
+                    try {
+                        // 替換為你的真實 LIFF ID
+                        await liff.init({ liffId: '2009010332-AYjg84ly' });
+                        
+                        if (!liff.isLoggedIn()) {
+                            // 如果沒登入，強制導向 LINE 登入畫面
+                            liff.login();
+                        } else {
+                            // 已經登入，抓取大頭貼與暱稱
+                            const profile = await liff.getProfile();
+                            setUserProfile(profile);
+                            setIsLiffInit(true);
+                        }
+                    } catch (err) {
+                        console.error('LIFF 初始化失敗', err);
+                        // 為了讓你在本機沒網域也能測試，錯誤時依然解鎖畫面
+                        setIsLiffInit(true);
+                    }
+                };
+                initLiff();
+            }, []);
 
             const addLog = (message) => {
                 const time = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
                 setLogs(prev => [`[${time}] ${message}`, ...prev]);
             };
 
+            // 如果 LIFF 還沒載入完，顯示轉圈圈畫面
+            if (!isLiffInit) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-teal-600">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-teal-600 mb-4"></div>
+                        <div className="font-bold tracking-wider text-slate-600">正在連線 LINE 帳號...</div>
+                    </div>
+                );
+            }
+
             return (
                 <div className="app-container flex flex-col font-sans">
-                    {/* 頂部切換器 */}
+                    {/* 頂部切換器與 LINE 帳號顯示 */}
                     <div className="bg-slate-800 text-white p-3 flex justify-between items-center text-sm z-50">
-                        <span>目前視角：{role === 'customer' ? '遊客 (集點)' : '店家 (給點)'}</span>
+                        <div className="flex items-center space-x-2 font-bold">
+                            {userProfile ? (
+                                <>
+                                    <img src={userProfile.pictureUrl} alt="Avatar" className="w-7 h-7 rounded-full border border-slate-500" />
+                                    <span>{userProfile.displayName}</span>
+                                </>
+                            ) : (
+                                <span>測試模式(未登入)</span>
+                            )}
+                        </div>
                         <div className="space-x-2">
-                            <button onClick={() => setRole('customer')} className={`px-2 py-1 rounded ${role === 'customer' ? 'bg-teal-500' : 'bg-slate-600'}`}>遊客端</button>
-                            <button onClick={() => setRole('shop')} className={`px-2 py-1 rounded ${role === 'shop' ? 'bg-teal-500' : 'bg-slate-600'}`}>店家端</button>
+                            {/* 開發測試用的切換按鈕，未來會隱藏 */}
+                            <button onClick={() => setRole('customer')} className={`px-2 py-1 rounded transition-colors ${role === 'customer' ? 'bg-teal-500' : 'bg-slate-600 hover:bg-slate-500'}`}>遊客端</button>
+                            <button onClick={() => setRole('shop')} className={`px-2 py-1 rounded transition-colors ${role === 'shop' ? 'bg-teal-500' : 'bg-slate-600 hover:bg-slate-500'}`}>店家端</button>
                         </div>
                     </div>
 
                     {/* 主要內容區 */}
                     <div className="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar relative">
                         {role === 'customer' 
-                            ? <CustomerView pointsObj={customerPoints} setPointsObj={setCustomerPoints} addLog={addLog} /> 
+                            ? <CustomerView pointsObj={customerPoints} setPointsObj={setCustomerPoints} addLog={addLog} userProfile={userProfile} /> 
                             : <ShopView activeShop={activeShop} setActiveShop={setActiveShop} mockShops={mockShops} setCustomerPoints={setCustomerPoints} addLog={addLog} />
                         }
                     </div>
@@ -69,14 +128,15 @@
             );
         }
 
-        function CustomerView({ pointsObj, setPointsObj, addLog }) {
+        function CustomerView({ pointsObj, setPointsObj, addLog, userProfile }) {
             const [redeemModal, setRedeemModal] = useState(null); 
             const [staffPassword, setStaffPassword] = useState('');
             const [redeemHistory, setRedeemHistory] = useState([]); 
             const [activeTab, setActiveTab] = useState('card');
 
             const totalPoints = pointsObj.food + pointsObj.souvenir + pointsObj.stay;
-            const customerSN = "MS-2026-A839"; 
+            // 抓取 LINE 名字作為集點卡持有人顯示
+            const customerName = userProfile ? userProfile.displayName : "訪客"; 
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -156,7 +216,9 @@
                     <div className="bg-gradient-primary rounded-b-[40px] pb-8 pt-6 px-4 shadow-sm relative z-10">
                         <div className="flex justify-between items-center text-teal-900 mb-6 px-2">
                             <span className="font-bold text-lg tracking-wider">商圈漫遊集點卡</span>
-                            <span className="bg-white/60 px-3 py-1 rounded-full text-xs font-bold text-teal-800">ID: {customerSN}</span>
+                            <span className="bg-white/60 px-3 py-1 rounded-full text-xs font-bold text-teal-800 max-w-[120px] truncate">
+                                {customerName}
+                            </span>
                         </div>
                         
                         <div className="text-center text-teal-900 mb-4">
@@ -182,26 +244,26 @@
 
                     {/* 頁籤切換 */}
                     <div className="flex justify-center space-x-8 mt-6 mb-4 px-6 border-b border-teal-100">
-                        <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
-                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>兌換紀錄 & 辦法</button>
+                        <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
+                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>兌換紀錄 & 辦法</button>
                     </div>
 
                     {/* 獎項兌換區 */}
                     {activeTab === 'card' && (
-                        <div className="px-5 space-y-4">
+                        <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
                                 const canRedeem = totalPoints >= gift.cost;
                                 return (
-                                    <div key={gift.id} onClick={() => initiateRedeem(gift)} className={`bg-white p-4 rounded-2xl shadow-sm border-2 ${canRedeem ? 'border-teal-400 cursor-pointer' : 'border-slate-100 opacity-60'}`}>
+                                    <div key={gift.id} onClick={() => initiateRedeem(gift)} className={`bg-white p-4 rounded-2xl shadow-sm border-2 transition-all ${canRedeem ? 'border-teal-500 cursor-pointer active:scale-95' : 'border-slate-100 opacity-60'}`}>
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center space-x-4">
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${canRedeem ? 'bg-teal-50 text-teal-600' : 'bg-slate-100 text-slate-400'}`}>🎁</div>
                                                 <div>
-                                                    <div className="font-bold text-slate-700">{gift.name}</div>
+                                                    <div className="font-bold text-slate-800">{gift.name}</div>
                                                     <div className={`text-sm font-bold mt-1 ${canRedeem ? 'text-teal-600' : 'text-slate-400'}`}>{gift.cost} 點</div>
                                                 </div>
                                             </div>
-                                            <button className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${canRedeem ? 'bg-teal-500 shadow-md' : 'bg-slate-300'}`}>兌換</button>
+                                            <button className={`px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors ${canRedeem ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-300'}`}>兌換</button>
                                         </div>
                                     </div>
                                 );
@@ -211,7 +273,7 @@
 
                     {/* 紀錄與辦法區 */}
                     {activeTab === 'rules' && (
-                        <div className="px-5 space-y-6">
+                        <div className="px-5 space-y-6 animate-fade-in">
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                 <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄</h3>
                                 {redeemHistory.length === 0 ? (
@@ -234,10 +296,14 @@
                                 )}
                             </div>
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-sm text-slate-600 space-y-2">
-                                <h3 className="font-bold text-slate-700 mb-3">活動辦法</h3>
-                                <p>1. 消費滿 200 元獲贈 1 點。</p>
-                                <p className="text-rose-500 font-bold">2. 兌換需由工作人員輸入密碼，請勿自行操作，誤觸恕不補發。</p>
-                                <p>3. 贈品數量有限，換完為止。</p>
+                                <h3 className="font-bold text-slate-700 mb-3 flex items-center"><span className="text-teal-500 mr-2">✦</span> 活動辦法</h3>
+                                <p>1. 於合作店家消費滿 200 元即可獲贈 1 點。</p>
+                                <p>2. 點數充足時，請至大會服務台出示手機畫面進行兌換。</p>
+                                <p className="text-rose-500 font-bold">3. 兌換操作需由大會工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
+                                <p>4. 贈品數量有限，換完為止。</p>
+                                <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400">
+                                    ※ 依公司規定，主辦單位保有最終修改、變更、活動解釋及終止本活動之權利。
+                                </div>
                             </div>
                         </div>
                     )}
@@ -245,22 +311,26 @@
                     {/* 工作人員密碼鎖 */}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
-                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
+                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
                                 <div className="bg-rose-500 p-4 text-center text-white">
-                                    <h3 className="font-bold text-lg">⚠️ 大會人員核銷專區</h3>
+                                    <h3 className="font-bold text-lg tracking-wider">⚠️ 大會人員核銷專區</h3>
+                                    <p className="text-xs opacity-90 mt-1">遊客請勿自行操作，以免點數失效</p>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="font-bold text-xl mb-4">{redeemModal.name}</p>
+                                    <p className="text-slate-500 text-sm">即將兌換</p>
+                                    <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
+                                    <p className="text-rose-500 font-bold mb-6 bg-rose-50 inline-block px-3 py-1 rounded-full text-sm">將扣除 {redeemModal.cost} 點</p>
+                                    
                                     <input 
                                         type="password" 
-                                        placeholder="輸入核銷密碼 (8888)"
+                                        placeholder="輸入核銷密碼 (測試:8888)"
                                         value={staffPassword}
                                         onChange={(e) => setStaffPassword(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl tracking-widest mb-6 focus:outline-none focus:border-rose-400"
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl tracking-widest mb-6 focus:outline-none focus:border-rose-400 transition-colors"
                                     />
                                     <div className="flex space-x-3">
-                                        <button onClick={() => setRedeemModal(null)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold">取消</button>
-                                        <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold">確認扣點</button>
+                                        <button onClick={() => {setRedeemModal(null); setStaffPassword('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消</button>
+                                        <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-600 transition-colors shadow-md">確認扣點</button>
                                     </div>
                                 </div>
                             </div>
@@ -299,8 +369,9 @@
             return (
                 <div className="min-h-full pb-10">
                     <div className="bg-white p-4 border-b border-slate-200 z-20 relative shadow-sm">
-                        <div className="text-xs text-slate-500 mb-2 font-bold flex justify-between">
+                        <div className="text-xs text-slate-500 mb-2 font-bold flex justify-between items-center">
                             <span>切換登入店家 (系統會自動鎖定類別)</span>
+                            <span className="text-teal-600 bg-teal-50 px-2 py-1 rounded">防作弊綁定</span>
                         </div>
                         <select 
                             value={activeShop.id} 
@@ -309,7 +380,7 @@
                                 setScanStatus('idle');
                                 setAmount('');
                             }}
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-slate-700 font-bold outline-none"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-slate-700 font-bold outline-none focus:border-teal-500 transition-colors shadow-inner"
                         >
                             {mockShops.map(shop => (
                                 <option key={shop.id} value={shop.id}>{shop.name} ({shop.typeName})</option>
@@ -318,24 +389,24 @@
                     </div>
 
                     <div className="p-5">
-                        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100">
+                        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100 relative z-10">
                             {scanStatus === 'idle' && (
-                                <button onClick={handleScan} className="w-full bg-teal-500 text-white font-bold py-10 rounded-2xl flex flex-col items-center">
+                                <button onClick={handleScan} className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-10 rounded-2xl flex flex-col items-center shadow-md transition-colors active:scale-95 cursor-pointer z-20 relative">
                                     <span className="text-4xl mb-2">📱</span>
                                     <span className="text-lg">點擊掃描客人條碼</span>
                                 </button>
                             )}
 
                             {scanStatus === 'scanning' && (
-                                <div className="w-full bg-slate-50 py-12 rounded-2xl flex flex-col items-center text-teal-600">
+                                <div className="w-full bg-slate-50 py-12 rounded-2xl flex flex-col items-center text-teal-600 border border-slate-200 shadow-inner">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mb-3"></div>
                                     <span className="font-bold">相機啟動中...</span>
                                 </div>
                             )}
 
                             {scanStatus === 'found' && (
-                                <div className="space-y-6">
-                                    <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center text-sm font-bold">
+                                <div className="space-y-6 animate-fade-in relative z-20">
+                                    <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center text-sm font-bold border border-emerald-200">
                                         ✅ 已成功鎖定遊客
                                     </div>
                                     <div>
@@ -344,23 +415,24 @@
                                             type="number" 
                                             value={amount}
                                             onChange={(e) => setAmount(e.target.value)}
-                                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-center font-bold outline-none focus:border-teal-400"
+                                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-center font-bold outline-none focus:border-teal-400 transition-colors shadow-inner relative z-30"
                                             placeholder="0"
+                                            style={{position: 'relative', zIndex: 30}}
                                         />
                                     </div>
-                                    <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center">
+                                    <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center border border-teal-100">
                                         <span className="text-teal-800 font-bold text-sm">系統自動換算點數</span>
                                         <div className="flex items-center space-x-2">
                                             <span className={`font-bold text-3xl ${activeShop.color}`}>{calculatedPoints}</span>
                                             <span className="text-sm text-slate-500">點</span>
                                         </div>
                                     </div>
-                                    <div className="flex space-x-3">
-                                        <button onClick={() => {setScanStatus('idle'); setAmount('');}} className="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-600">取消</button>
+                                    <div className="flex space-x-3 relative z-30 pt-2">
+                                        <button onClick={() => {setScanStatus('idle'); setAmount('');}} className="flex-1 bg-slate-100 hover:bg-slate-200 py-4 rounded-2xl font-bold text-slate-600 transition-colors active:scale-95 cursor-pointer">取消</button>
                                         <button 
                                             onClick={handleSubmit} 
                                             disabled={calculatedPoints <= 0} 
-                                            className={`flex-[2] py-4 rounded-2xl font-bold text-lg ${calculatedPoints > 0 ? 'bg-teal-500 text-white' : 'bg-slate-200 text-slate-400'}`}
+                                            className={`flex-[2] py-4 rounded-2xl font-bold text-lg shadow-md transition-all active:scale-95 ${calculatedPoints > 0 ? 'bg-teal-500 hover:bg-teal-600 text-white cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                                         >
                                             確認發送
                                         </button>
