@@ -2,7 +2,7 @@ export default async function handler(req, res) {
     // 這裡會安全地讀取你在 Vercel 後台設定的環境變數
     const apiKey = process.env.AIRTABLE_API_KEY;
     const baseId = process.env.AIRTABLE_BASE_ID;
-    const tableName = 'Shops'; // 你的 Airtable 資料表名稱，請依實際情況修改
+    const tableName = 'Table2'; // 你的 Airtable 資料表名稱，請依實際情況修改
 
     if (!apiKey || !baseId) {
         return res.status(500).json({ error: '遺失 Airtable 環境變數' });
