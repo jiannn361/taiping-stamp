@@ -10,9 +10,9 @@
     <!-- 載入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- 載入 Babel (瀏覽器端編譯 JSX) -->
+    <!-- 載入 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 【重點】載入 LINE LIFF SDK -->
+    <!-- 載入 LINE LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
     <style>
@@ -21,7 +21,6 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         /* 淺色薄荷綠與水藍漸層 */
         .bg-gradient-primary { background: linear-gradient(135deg, #ccfbf1 0%, #e0f2fe 100%); }
-        /* 動畫設定 */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
@@ -32,49 +31,53 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // 雲朵貼紙圖示
+        // 雲朵圖示
         const CloudIcon = ({ className }) => (
             <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
                 <path d="M17.5 19c2.76 0 5-2.24 5-5s-2.24-5-5-5c-.17 0-.34.02-.51.05C16.43 6.13 13.93 4 11 4c-3.87 0-7 3.13-7 7 0 .17 0 .34.02.51C1.75 11.96 0 13.71 0 16c0 2.76 2.24 5 5 5h12.5z"/>
             </svg>
         );
 
-        // 店家名單與對應的顏色
-        const mockShops = [
-            { id: 'S01', name: '古早味小吃攤', category: 'food', typeName: '小吃', color: 'text-orange-400' },
-            { id: 'S02', name: '梅山特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-teal-400' }
-        ];
+        // 【關鍵】店家權限名單：在這裡綁定 LINE UID
+        const SHOP_ADMINS = {
+            // 格式： 'LINE_UID' : { 店家資訊 }
+            'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '古早味小吃攤', category: 'food', typeName: '小吃', color: 'text-orange-400' },
+            'Uabcdef1234567890abcdef1234567890': { id: 'S02', name: '梅山特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
+            // 你可以把下面這個改成你自己的真實 UID，你就會變成民宿老闆！
+            'U_PUT_YOUR_UID_HERE': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-teal-400' }
+        };
 
         function App() {
-            const [role, setRole] = useState('customer');
-            const [activeShop, setActiveShop] = useState(mockShops[0]);
+            const [role, setRole] = useState('customer'); // 預設為遊客
+            const [activeShop, setActiveShop] = useState(null); 
             const [customerPoints, setCustomerPoints] = useState({ food: 2, souvenir: 1, stay: 0 }); 
             const [logs, setLogs] = useState([]); 
             
-            // LINE 狀態管理
             const [isLiffInit, setIsLiffInit] = useState(false);
             const [userProfile, setUserProfile] = useState(null);
 
             useEffect(() => {
-                // 啟動 LINE LIFF 引擎
                 const initLiff = async () => {
                     try {
-                        // 替換為你的真實 LIFF ID
-                        await liff.init({ liffId: '2009010332-AYjg84ly' });
+                        await liff.init({ liffId: '2009010332-AYjg84ly' }); // 你的真實 LIFF ID
                         
                         if (!liff.isLoggedIn()) {
-                            // 如果沒登入，強制導向 LINE 登入畫面
                             liff.login();
                         } else {
-                            // 已經登入，抓取大頭貼與暱稱
                             const profile = await liff.getProfile();
                             setUserProfile(profile);
+                            
+                            // 【權限判定】檢查這個人的 UID 有沒有在店家名單裡
+                            if (SHOP_ADMINS[profile.userId]) {
+                                setRole('shop'); // 變身為店家
+                                setActiveShop(SHOP_ADMINS[profile.userId]); // 鎖定該店資訊
+                            } else {
+                                setRole('customer'); // 一般遊客
+                            }
                             setIsLiffInit(true);
                         }
                     } catch (err) {
-                        console.error('LIFF 初始化失敗', err);
-                        // 為了讓你在本機沒網域也能測試，錯誤時依然解鎖畫面
+                        console.error('LIFF Error', err);
                         setIsLiffInit(true);
                     }
                 };
@@ -86,19 +89,17 @@
                 setLogs(prev => [`[${time}] ${message}`, ...prev]);
             };
 
-            // 如果 LIFF 還沒載入完，顯示轉圈圈畫面
             if (!isLiffInit) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-teal-600">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-teal-600 mb-4"></div>
-                        <div className="font-bold tracking-wider text-slate-600">正在連線 LINE 帳號...</div>
+                        <div className="font-bold tracking-wider text-slate-600">驗證 LINE 授權中...</div>
                     </div>
                 );
             }
 
             return (
                 <div className="app-container flex flex-col font-sans">
-                    {/* 頂部切換器與 LINE 帳號顯示 */}
                     <div className="bg-slate-800 text-white p-3 flex justify-between items-center text-sm z-50">
                         <div className="flex items-center space-x-2 font-bold">
                             {userProfile ? (
@@ -107,21 +108,26 @@
                                     <span>{userProfile.displayName}</span>
                                 </>
                             ) : (
-                                <span>測試模式(未登入)</span>
+                                <span>測試模式</span>
                             )}
                         </div>
-                        <div className="space-x-2">
-                            {/* 開發測試用的切換按鈕，未來會隱藏 */}
-                            <button onClick={() => setRole('customer')} className={`px-2 py-1 rounded transition-colors ${role === 'customer' ? 'bg-teal-500' : 'bg-slate-600 hover:bg-slate-500'}`}>遊客端</button>
-                            <button onClick={() => setRole('shop')} className={`px-2 py-1 rounded transition-colors ${role === 'shop' ? 'bg-teal-500' : 'bg-slate-600 hover:bg-slate-500'}`}>店家端</button>
-                        </div>
+                        {/* 開發者工具：顯示你的 UID，點擊可複製 */}
+                        {userProfile && (
+                            <div 
+                                className="text-[10px] text-slate-400 bg-slate-700 px-2 py-1 rounded truncate max-w-[120px] cursor-pointer hover:bg-slate-600" 
+                                onClick={() => {
+                                    alert(`你的 LINE UID 是:\n\n${userProfile.userId}\n\n將這串代碼加入 SHOP_ADMINS，你就能變成店家！`);
+                                }}
+                            >
+                                UID: {userProfile.userId.substring(0,6)}...
+                            </div>
+                        )}
                     </div>
 
-                    {/* 主要內容區 */}
                     <div className="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar relative">
                         {role === 'customer' 
                             ? <CustomerView pointsObj={customerPoints} setPointsObj={setCustomerPoints} addLog={addLog} userProfile={userProfile} /> 
-                            : <ShopView activeShop={activeShop} setActiveShop={setActiveShop} mockShops={mockShops} setCustomerPoints={setCustomerPoints} addLog={addLog} />
+                            : <ShopView activeShop={activeShop} setCustomerPoints={setCustomerPoints} addLog={addLog} />
                         }
                     </div>
                 </div>
@@ -133,9 +139,9 @@
             const [staffPassword, setStaffPassword] = useState('');
             const [redeemHistory, setRedeemHistory] = useState([]); 
             const [activeTab, setActiveTab] = useState('card');
+            const [showBindingModal, setShowBindingModal] = useState(false);
 
             const totalPoints = pointsObj.food + pointsObj.souvenir + pointsObj.stay;
-            // 抓取 LINE 名字作為集點卡持有人顯示
             const customerName = userProfile ? userProfile.displayName : "訪客"; 
 
             const redeemGifts = [
@@ -212,7 +218,6 @@
 
             return (
                 <div className="min-h-full pb-10">
-                    {/* 卡片頭部 */}
                     <div className="bg-gradient-primary rounded-b-[40px] pb-8 pt-6 px-4 shadow-sm relative z-10">
                         <div className="flex justify-between items-center text-teal-900 mb-6 px-2">
                             <span className="font-bold text-lg tracking-wider">商圈漫遊集點卡</span>
@@ -228,7 +233,6 @@
                             </div>
                         </div>
 
-                        {/* 雲朵貼紙區 */}
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4">
                             <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
                                 {renderStickers()}
@@ -242,13 +246,11 @@
                         </div>
                     </div>
 
-                    {/* 頁籤切換 */}
                     <div className="flex justify-center space-x-8 mt-6 mb-4 px-6 border-b border-teal-100">
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
                         <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>兌換紀錄 & 辦法</button>
                     </div>
 
-                    {/* 獎項兌換區 */}
                     {activeTab === 'card' && (
                         <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
@@ -271,7 +273,6 @@
                         </div>
                     )}
 
-                    {/* 紀錄與辦法區 */}
                     {activeTab === 'rules' && (
                         <div className="px-5 space-y-6 animate-fade-in">
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
@@ -301,14 +302,62 @@
                                 <p>2. 點數充足時，請至大會服務台出示手機畫面進行兌換。</p>
                                 <p className="text-rose-500 font-bold">3. 兌換操作需由大會工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
                                 <p>4. 贈品數量有限，換完為止。</p>
-                                <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400">
-                                    ※ 依公司規定，主辦單位保有最終修改、變更、活動解釋及終止本活動之權利。
+                                <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400">※ 主辦單位保有最終修改、變更、活動解釋及終止本活動之權利。</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {}
+                    <div className="px-5 mt-12 mb-8 text-center">
+                        <button 
+                            onClick={() => setShowBindingModal(true)}
+                            className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600"
+                        >
+                            我是合作店家，需要開通發送點數權限
+                        </button>
+                    </div>
+
+                    {}
+                    {showBindingModal && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-5">
+                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative">
+                                <div className="bg-slate-800 p-4 text-center text-white">
+                                    <h3 className="font-bold text-lg tracking-wider">店家系統綁定申請</h3>
+                                </div>
+                                <div className="p-6 text-center">
+                                    <p className="text-slate-600 text-sm mb-4">請將下方的專屬代碼，傳送給大會工作人員，以便為您綁定店家權限。</p>
+                                    
+                                    <div className="bg-slate-100 p-4 rounded-xl mb-6 break-all">
+                                        <p className="text-xs text-slate-500 mb-1">您的專屬綁定碼</p>
+                                        <p className="font-mono font-bold text-slate-800 text-sm select-all">
+                                            {userProfile ? userProfile.userId : "請先在 LINE 中開啟"}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="flex flex-col space-y-3">
+                                        <button 
+                                            onClick={() => {
+                                                const text = `【店家權限開通申請】\n你好，我是商圈店家，我的專屬綁定碼是：\n${userProfile.userId}\n請幫我開通發送點數的權限，謝謝！`;
+                                                // 呼叫 LINE 的分享功能 (網頁跳轉)
+                                                window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+                                            }}
+                                            className="w-full py-3 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 transition-colors shadow-md flex justify-center items-center"
+                                        >
+                                            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M24 11.693c0 6.075-5.918 10.999-13.2 10.999-1.282 0-2.479-.153-3.585-.436-1.527.91-3.613 2.158-5.385 2.624-.316.083-.655-.078-.775-.386-.118-.309.006-.653.284-.813 1.396-.8 2.871-2.095 3.58-3.045C1.865 19.167 0 15.65 0 11.693 0 5.618 5.918.694 13.2.694 24 .694 24 5.618 24 11.693z"/></svg>
+                                            一鍵傳送給大會 LINE
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowBindingModal(false)} 
+                                            className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors"
+                                        >
+                                            關閉
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 工作人員密碼鎖 */}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -340,7 +389,7 @@
             );
         }
 
-        function ShopView({ activeShop, setActiveShop, mockShops, setCustomerPoints, addLog }) {
+        function ShopView({ activeShop, setCustomerPoints, addLog }) {
             const [amount, setAmount] = useState('');
             const [scanStatus, setScanStatus] = useState('idle'); 
 
@@ -368,24 +417,18 @@
 
             return (
                 <div className="min-h-full pb-10">
+                    {/* 已經自動鎖定店家，不需要下拉選單了 */}
                     <div className="bg-white p-4 border-b border-slate-200 z-20 relative shadow-sm">
                         <div className="text-xs text-slate-500 mb-2 font-bold flex justify-between items-center">
-                            <span>切換登入店家 (系統會自動鎖定類別)</span>
-                            <span className="text-teal-600 bg-teal-50 px-2 py-1 rounded">防作弊綁定</span>
+                            <span>目前登入店家帳號</span>
+                            <span className="text-teal-600 bg-teal-50 px-2 py-1 rounded">✅ 已安全綁定</span>
                         </div>
-                        <select 
-                            value={activeShop.id} 
-                            onChange={(e) => {
-                                setActiveShop(mockShops.find(s => s.id === e.target.value));
-                                setScanStatus('idle');
-                                setAmount('');
-                            }}
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-slate-700 font-bold outline-none focus:border-teal-500 transition-colors shadow-inner"
-                        >
-                            {mockShops.map(shop => (
-                                <option key={shop.id} value={shop.id}>{shop.name} ({shop.typeName})</option>
-                            ))}
-                        </select>
+                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center">
+                            <span className="text-slate-700 font-bold text-lg">{activeShop.name}</span>
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full bg-white border ${activeShop.color} border-current`}>
+                                發放類別：{activeShop.typeName}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="p-5">
