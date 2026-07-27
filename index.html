@@ -473,6 +473,83 @@
         }
 
         // ==========================================
+        // 地圖元件 (包含 Voyager 地圖與 Emoji 標記)
+        // ==========================================
+        function MapComponent() {
+            const mapRef = useRef(null);
+
+            // 取得對應的分類表情符號 (依照你的截圖邏輯)
+            const getCategoryEmoji = (category) => {
+                if (!category) return '📍';
+                const cat = category.toLowerCase();
+                if (cat.includes('stay') || cat.includes('住宿') || cat.includes('民宿')) return '🏠';
+                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳')) return '🍽️';
+                if (cat.includes('attraction') || cat.includes('景點') || cat.includes('步道')) return '🥾';
+                if (cat.includes('experience') || cat.includes('體驗')) return '✨';
+                if (cat.includes('transport') || cat.includes('交通')) return '🚌';
+                if (cat.includes('souvenir') || cat.includes('伴手禮') || cat.includes('gift')) return '🎁';
+                return '📍';
+            };
+
+            useEffect(() => {
+                // 避免 React 嚴格模式下重複初始化地圖
+                if (mapRef.current) return;
+
+                // 初始化地圖，中心點設定在梅山鄉
+                const map = L.map('map-container', { zoomControl: false }).setView([23.582, 120.558], 15);
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+                mapRef.current = map;
+
+                // 🎨 使用明亮質感的 Voyager 探索者地圖
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap © CARTO'
+                }).addTo(map);
+
+                // 載入 Airtable API 資料並加上標記
+                fetchAirtableData().then(shops => {
+                    if(!shops || shops.length === 0) return;
+                    
+                    shops.forEach(shop => {
+                        if (shop.lat && shop.lng) {
+                            const emoji = getCategoryEmoji(shop.category || shop.type || shop.name);
+                            
+                            // 建立帶有 Emoji 的客製化圖示
+                            const customIcon = L.divIcon({
+                                className: 'custom-marker', // 清除預設樣式
+                                html: `<div class="custom-marker-icon w-8 h-8 rounded-full border-2 border-slate-200 flex items-center justify-center text-sm shadow-md" style="background-color: #1f2937;">
+                                         ${emoji}
+                                       </div>`,
+                                iconSize: [32, 32],
+                                iconAnchor: [16, 32],
+                                popupAnchor: [0, -32]
+                            });
+
+                            L.marker([shop.lat, shop.lng], { icon: customIcon })
+                                .addTo(map)
+                                .bindPopup(`
+                                    <div class="text-center font-sans p-1">
+                                        <strong class="text-teal-700 block text-base">${shop.name}</strong>
+                                        <span class="text-xs text-slate-500 block mt-1">${shop.type || '合作店家'}</span>
+                                        ${shop.address ? `<span class="text-xs text-slate-400 block mt-1">${shop.address}</span>` : ''}
+                                    </div>
+                                `);
+                        }
+                    });
+                });
+
+                return () => {
+                    if (mapRef.current) {
+                        mapRef.current.remove();
+                        mapRef.current = null;
+                    }
+                };
+            }, []);
+
+            return <div id="map-container" className="w-full h-full z-0 rounded-2xl"></div>;
+        }
+
+        // ==========================================
         // 抓取 Airtable 資料 (安全後端串接版)
         // ==========================================
         async function fetchAirtableData() {
