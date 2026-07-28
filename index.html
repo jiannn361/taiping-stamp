@@ -5,19 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>商圈數位集點系統</title>
     
-    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 載入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- 載入 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 載入 LINE LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <!-- 載入 Leaflet 地圖套件 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <!-- 載入 HTML5 QR Code 掃描套件 -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
@@ -29,8 +23,10 @@
         .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
-        /* 解決地圖 z-index 問題 */
         .leaflet-container { z-index: 1 !important; }
+        
+        /* 解決地圖標籤白底的問題，完美還原你舊版 App 的標籤風格 */
+        .custom-map-marker { background: none !important; border: none !important; }
     </style>
 </head>
 <body>
@@ -48,13 +44,12 @@
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '古早味小吃攤', category: 'food', typeName: '小吃', color: 'text-orange-400' },
             'Uabcdef1234567890abcdef1234567890': { id: 'S02', name: '梅山特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            'U_PUT_YOUR_UID_HERE': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-teal-400' }
         };
 
         const Toast = ({ message }) => {
             if (!message) return null;
             return (
-                <div className="fixed top-12 left-1/2 z-[9999] bg-slate-800/95 text-white px-6 py-3 rounded-full shadow-2xl animate-slide-down flex items-center space-x-2 whitespace-nowrap font-bold text-sm backdrop-blur-sm border border-slate-600">
+                <div className="fixed top-12 left-1/2 z-[9999] bg-slate-800/95 text-white px-6 py-3 rounded-full shadow-2xl animate-slide-down flex items-center space-x-2 whitespace-nowrap font-bold text-sm backdrop-blur-sm border border-slate-600 transform -translate-x-1/2">
                     <span>{message}</span>
                 </div>
             );
@@ -64,7 +59,6 @@
             const [role, setRole] = useState('customer');
             const [activeShop, setActiveShop] = useState(null);
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0 }); 
-            const [logs, setLogs] = useState([]); 
             const [copied, setCopied] = useState(false);
             const [isLiffInit, setIsLiffInit] = useState(false);
             const [userProfile, setUserProfile] = useState(null);
@@ -95,7 +89,7 @@
                         }
                     } catch (err) {
                         console.error('LIFF Error', err);
-                        setUserProfile({ userId: 'U_GUEST_12345', displayName: '測試遊客' });
+                        setUserProfile({ userId: 'U_TEST_MODE_12345', displayName: '測試遊客' });
                         setIsLiffInit(true); 
                     }
                 };
@@ -112,16 +106,11 @@
                 }
             };
 
-            const addLog = (message) => {
-                const time = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
-                setLogs(prev => [`[${time}] ${message}`, ...prev]);
-            };
-
             if (!isLiffInit) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-teal-600">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-teal-600 mb-4"></div>
-                        <div className="font-bold tracking-wider text-slate-600">驗證 LINE 授權中...</div>
+                        <div className="font-bold tracking-wider text-slate-600">載入系統中...</div>
                     </div>
                 );
             }
@@ -142,10 +131,7 @@
                             )}
                         </div>
                         {userProfile && (
-                            <div 
-                                className="text-[10px] bg-slate-700/50 px-2 py-1 rounded cursor-pointer hover:bg-slate-600 transition-colors flex items-center" 
-                                onClick={copyUID}
-                            >
+                            <div className="text-[10px] bg-slate-700/50 px-2 py-1 rounded cursor-pointer hover:bg-slate-600 transition-colors flex items-center" onClick={copyUID}>
                                 <span className={copied ? "text-green-400 font-bold" : "text-slate-200"}>
                                     {copied ? "已複製!" : `UID: ${userProfile.userId.substring(0,6)}...`}
                                 </span>
@@ -155,27 +141,24 @@
 
                     <div className="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar relative">
                         {role === 'customer' 
-                            ? <CustomerView pointsObj={customerPoints} setPointsObj={setCustomerPoints} addLog={addLog} userProfile={userProfile} showToast={showToast} /> 
-                            : <ShopView activeShop={activeShop} setCustomerPoints={setCustomerPoints} addLog={addLog} showToast={showToast} />
+                            ? <CustomerView pointsObj={customerPoints} setPointsObj={setCustomerPoints} userProfile={userProfile} showToast={showToast} /> 
+                            : <ShopView activeShop={activeShop} setCustomerPoints={setCustomerPoints} showToast={showToast} />
                         }
                     </div>
                 </div>
             );
         }
 
-        function CustomerView({ pointsObj, setPointsObj, addLog, userProfile, showToast }) {
+        function CustomerView({ pointsObj, setPointsObj, userProfile, showToast }) {
             const [redeemModal, setRedeemModal] = useState(null); 
             const [staffPassword, setStaffPassword] = useState('');
             const [redeemHistory, setRedeemHistory] = useState([]); 
             const [activeTab, setActiveTab] = useState('card'); 
             const [showBindingModal, setShowBindingModal] = useState(false);
-            
-            // 新增：申請店家的名稱輸入狀態
             const [applyShopName, setApplyShopName] = useState('');
 
             const [currentPage, setCurrentPage] = useState(0);
             const scrollContainerRef = useRef(null);
-
             const totalPoints = pointsObj.food + pointsObj.souvenir + pointsObj.stay;
 
             const handleScroll = () => {
@@ -196,7 +179,7 @@
 
             const initiateRedeem = (gift) => {
                 if (totalPoints >= gift.cost) setRedeemModal(gift); 
-                else showToast('點數不足喔！請繼續在商圈消費集點。');
+                else showToast('❌ 點數不足喔！請繼續在商圈消費集點。');
             };
 
             const confirmStaffRedeem = () => {
@@ -224,9 +207,20 @@
 
                 setPointsObj(newPoints);
                 setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
-                showToast('✅ 兌換成功！');
+                showToast('✅ 核銷成功！請將贈品交給遊客。');
                 setRedeemModal(null);
                 setStaffPassword('');
+            };
+
+            const handleApplyBinding = (e) => {
+                e.preventDefault();
+                if (!applyShopName || applyShopName.trim() === '') {
+                    showToast('❌ 請務必輸入您的店名，才能進行開通喔！');
+                    return;
+                }
+                const url = `https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的專屬代碼是：${userProfile?.userId}`;
+                window.open(url, '_blank');
+                setShowBindingModal(false);
             };
 
             const renderPages = () => {
@@ -286,7 +280,6 @@
                             </div>
                         </div>
 
-                        {/* 點數卡片區 */}
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl py-5 border border-white/60 shadow-sm mt-4 overflow-hidden relative">
                             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth">
                                 {pages}
@@ -301,19 +294,17 @@
                             )}
                         </div>
                         
-                        {/* 🌟 修改點 1：會員條碼直接顯示在集點卡下方 */}
-                        <div className="bg-white rounded-3xl mt-4 p-5 shadow-sm text-center flex flex-col items-center border border-teal-50">
-                            <h3 className="font-bold text-sm text-teal-800 mb-2">出示此條碼給店家發送點數</h3>
-                            <div className="bg-slate-50 p-2 inline-block border-2 border-slate-100 rounded-xl">
+                        {/* 會員條碼區 */}
+                        <div className="bg-white rounded-3xl mt-4 p-5 shadow-sm text-center flex flex-col items-center border border-teal-50 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-emerald-400"></div>
+                            <h3 className="font-extrabold text-sm text-slate-700 mb-3">請出示此條碼給店家發送點數</h3>
+                            <div className="bg-slate-50 p-2 inline-block border-2 border-slate-100 rounded-2xl shadow-inner">
                                 <img 
                                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${userProfile?.userId || 'GUEST_MODE_UID'}`} 
                                     alt="QR Code" 
-                                    className="w-32 h-32" 
+                                    className="w-36 h-36 mix-blend-multiply" 
                                 />
                             </div>
-                            <span className="text-[10px] text-slate-400 font-mono mt-2 bg-slate-100 px-2 py-1 rounded">
-                                UID: {userProfile?.userId || '尚未登入 LINE'}
-                            </span>
                         </div>
                     </div>
 
@@ -323,6 +314,7 @@
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>商圈地圖</button>
                     </div>
 
+                    {/* 頁籤內容區域 */}
                     {activeTab === 'card' && (
                         <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
@@ -380,12 +372,12 @@
                     )}
 
                     <div className="px-5 mt-12 mb-8 text-center">
-                        <button onClick={() => setShowBindingModal(true)} className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600">
-                            我是合作店家，需要開通發送點數權限
+                        <button onClick={() => setShowBindingModal(true)} className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600 font-bold">
+                            我是合作店家，需要開通發點權限
                         </button>
                     </div>
 
-                    {/* 兌換大會密碼 Modal */}
+                    {/* 大會核銷 Modal */}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -394,51 +386,53 @@
                                 </div>
                                 <div className="p-6 text-center">
                                     <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
-                                    <p className="text-rose-500 font-bold mb-6">將扣除 {redeemModal.cost} 點</p>
+                                    <p className="text-rose-500 font-bold mb-6 bg-rose-50 inline-block px-3 py-1 rounded-full text-sm">將扣除 {redeemModal.cost} 點</p>
                                     <input 
                                         type="password" placeholder="輸入密碼(8888)" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none"
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none focus:border-rose-400 transition-colors"
                                     />
                                     <div className="flex space-x-3">
-                                        <button onClick={() => setRedeemModal(null)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold">取消</button>
-                                        <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold">確認扣點</button>
+                                        <button onClick={() => {setRedeemModal(null); setStaffPassword('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">取消</button>
+                                        <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600">確認扣點</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
                     
-                    {/* 🌟 修改點 2：店家開通申請，加入店名輸入框 */}
+                    {/* 店家開通 Modal */}
                     {showBindingModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
                                 <div className="bg-slate-800 p-4 text-center text-white">
-                                    <h3 className="font-bold text-lg">店家開通申請</h3>
+                                    <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4">請填寫您的店名，並將代碼傳送給大會，以開通發送點數的權限。</p>
+                                    <p className="text-sm text-slate-600 mb-4">填妥下方資料並傳送給大會審核。</p>
                                     
-                                    <input 
-                                        type="text" 
-                                        placeholder="請輸入您的店名 (如：太平牛肉麵)"
-                                        value={applyShopName}
-                                        onChange={(e) => setApplyShopName(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-sm mb-4 outline-none focus:border-teal-400"
-                                    />
+                                    <div className="text-left mb-4">
+                                        <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="例如：太平老街牛肉麵"
+                                            value={applyShopName}
+                                            onChange={(e) => setApplyShopName(e.target.value)}
+                                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-teal-400 transition-colors"
+                                        />
+                                    </div>
 
                                     <div className="bg-slate-100 p-3 rounded-xl font-mono text-xs text-slate-800 break-all mb-6 font-bold border-2 border-slate-200">
-                                        UID: {userProfile ? userProfile.userId : "無法取得，請確認已登入 LINE"}
+                                        UID: {userProfile ? userProfile.userId : "無法取得"}
                                     </div>
                                     
                                     <div className="flex flex-col space-y-3">
-                                        <a 
-                                            href={`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName || '未填寫'}%0A我的專屬代碼是：${userProfile?.userId}`} 
-                                            target="_blank"
-                                            className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center"
+                                        <button 
+                                            onClick={handleApplyBinding}
+                                            className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors"
                                         >
                                             一鍵傳送 LINE 給大會
-                                        </a>
-                                        <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold">稍後再說</button>
+                                        </button>
+                                        <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
                             </div>
@@ -463,68 +457,116 @@
                 return '📍';
             };
 
-            // 負責把資料畫到地圖上的核心函數
+            const getCategoryColor = (category) => {
+                const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
+                if (cat.includes('小吃') || cat.includes('food') || cat.includes('美食')) return '#f59e0b';
+                if (cat.includes('伴手禮') || cat.includes('gift') || cat.includes('商店')) return '#ec4899';
+                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '#3b82f6';
+                if (cat.includes('景點') || cat.includes('attraction') || cat.includes('步道')) return '#10b981';
+                return '#1f2937'; // 預設深色
+            };
+
             const renderShopsToMap = (map, shops) => {
+                const bounds = [];
                 shops.forEach(shop => {
                     if (shop.lat && shop.lng) {
+                        bounds.push([shop.lat, shop.lng]);
                         const emoji = getCategoryEmoji(shop.category);
+                        const markerBorder = getCategoryColor(shop.category);
+                        
+                        // 🌟 完美還原舊版 App 的懸浮標籤設計
+                        const customHtml = `
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content; pointer-events: auto; cursor: pointer;">
+                              <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
+                                <span style="font-size: 18px;">${emoji}</span>
+                              </div>
+                              <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(4px); white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
+                                ${shop.name}
+                              </div>
+                            </div>
+                        `;
+
                         const customIcon = L.divIcon({
-                            className: 'custom-marker',
-                            html: `<div class="w-8 h-8 rounded-full flex items-center justify-center shadow-md text-base" style="background-color: #1f2937; border: 2px solid #e2e8f0; color: white;">${emoji}</div>`,
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 32],
-                            popupAnchor: [0, -32]
+                            className: 'custom-map-marker',
+                            html: customHtml,
+                            iconSize: [0, 0],
+                            iconAnchor: [0, 0]
                         });
 
-                        const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}`;
+                        const googleMapsLink = shop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}`;
                         
-                        let popupContent = `<div class="font-sans w-48">`;
+                        let popupContent = `<div class="font-sans w-56 flex flex-col">`;
                         if (shop.photo) {
-                            popupContent += `<div class="w-full h-24 mb-2 rounded-lg overflow-hidden bg-slate-100"><img src="${shop.photo}" class="w-full h-full object-cover" alt="店家照片" /></div>`;
+                            popupContent += `<div class="w-full h-32 mb-3 rounded-xl overflow-hidden bg-slate-100 shadow-inner"><img src="${shop.photo}" class="w-full h-full object-cover" alt="店家照片" /></div>`;
                         }
                         popupContent += `
-                            <strong class="text-teal-700 block text-base mb-1">${shop.name}</strong>
-                            ${shop.category ? `<span class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded">${Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}</span>` : ''}
-                            ${shop.phone ? `<div class="text-xs text-slate-600 mt-1">📞 ${shop.phone}</div>` : ''}
-                            ${shop.address ? `<div class="text-xs text-slate-500 mt-1">📍 ${shop.address}</div>` : ''}
-                            ${shop.description ? `<div class="text-xs text-slate-500 mt-2 line-clamp-2">${shop.description}</div>` : ''}
-                            <a href="${googleMapsLink}" target="_blank" class="block w-full text-center bg-teal-500 text-white text-xs font-bold py-2 rounded-lg mt-3 shadow-sm hover:bg-teal-600">Google 實景導航</a>
+                            <strong class="text-slate-800 block text-lg mb-1 leading-tight">${shop.name}</strong>
+                            ${shop.category ? `<span class="bg-teal-50 text-teal-700 text-[11px] px-2 py-1 rounded-md font-bold mb-2 inline-block border border-teal-100">${Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}</span>` : ''}
+                            ${shop.phone ? `<div class="text-xs text-slate-600 mt-2 flex items-center gap-1.5 font-bold">📞 <a href="tel:${shop.phone}" class="text-teal-600 hover:underline">${shop.phone}</a></div>` : ''}
+                            ${shop.address ? `<div class="text-xs text-slate-600 mt-1 flex items-start gap-1.5 font-bold">📍 <span class="leading-tight">${shop.address}</span></div>` : ''}
+                            ${shop.description ? `<div class="text-xs text-slate-500 mt-3 line-clamp-3 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">${shop.description}</div>` : ''}
+                            <a href="${googleMapsLink}" target="_blank" class="flex items-center justify-center gap-2 w-full text-center bg-teal-600 text-white text-sm font-bold py-3 rounded-xl mt-4 shadow-md hover:bg-teal-700 transition-colors active:scale-95">
+                                🗺️ 前往 Google 導航
+                            </a>
                         </div>`;
 
                         L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map).bindPopup(popupContent);
                     }
                 });
+
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+                }
             };
 
             useEffect(() => {
-                if (mapRef.current) return;
+                let isMounted = true;
+                if (!mapRef.current) {
+                    const container = document.getElementById('map-container');
+                    if (container) container.innerHTML = ''; // 確保地圖容器乾淨，避免當機
+                    
+                    const map = L.map('map-container', { zoomControl: false }).setView([23.559, 120.605], 16);
+                    L.control.zoom({ position: 'bottomright' }).addTo(map);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        maxZoom: 20,
+                        attribution: '© OpenStreetMap © CARTO'
+                    }).addTo(map);
+                    mapRef.current = map;
+                }
 
-                // 📍 將地圖中心點精確鎖定在梅山太平老街
-                const map = L.map('map-container', { zoomControl: false }).setView([23.559, 120.605], 16);
-                L.control.zoom({ position: 'bottomright' }).addTo(map);
-                mapRef.current = map;
+                const map = mapRef.current;
 
-                // 🎨 使用 Carto Voyager 探索者地圖底圖
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 20,
-                    attribution: '© OpenStreetMap © CARTO'
-                }).addTo(map);
+                const fetchWithFallback = async () => {
+                    try {
+                        // 智慧雙重搜尋：就算你檔名少打 s 也抓得到
+                        let res = await fetch('/api/shops');
+                        if (res.status === 404) {
+                            res = await fetch('/api/shop');
+                        }
+                        
+                        if (!res.ok) throw new Error(`HTTP 錯誤: ${res.status}`);
+                        
+                        const contentType = res.headers.get("content-type");
+                        if (!contentType || !contentType.includes("application/json")) {
+                            throw new Error("伺服器回傳的不是 JSON，可能是路徑設定錯誤");
+                        }
+                        return await res.json();
+                    } catch (err) {
+                        throw err;
+                    }
+                };
 
-                // 🌟 修改點 3：智慧判斷機制 (預覽環境備用資料)
-                fetch('/api/shops')
-                    .then(res => {
-                        if (!res.ok) throw new Error('找不到後端 API');
-                        return res.json();
-                    })
+                fetchWithFallback()
                     .then(shops => {
-                        renderShopsToMap(map, shops); // 如果在正式版 Vercel，就畫出 Airtable 真實資料
+                        if (!isMounted) return;
+                        renderShopsToMap(map, shops);
                     })
                     .catch(err => {
-                        console.warn("📌 目前在預覽環境，啟用備用測試資料！");
-                        // 這是備用的太平老街店家資料，讓你在預覽模式也能看到地圖運作！
+                        if (!isMounted) return;
+                        console.warn("📌 目前在本地預覽環境，或 Vercel API 設定有誤，載入備用資料！", err);
                         const mockShops = [
-                            { name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。' },
-                            { name: '冬瓜妹', category: '小吃', lat: 23.5588, lng: 120.6052, description: '知名茶葉蛋與特調冬瓜茶。' },
+                            { name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。', photo: 'https://placehold.co/400x300/10b981/white?text=Sky+Bridge' },
+                            { name: '冬瓜妹', category: '小吃', lat: 23.5588, lng: 120.6052, description: '知名茶葉蛋與特調冬瓜茶。', photo: 'https://placehold.co/400x300/f59e0b/white?text=Tea+Eggs' },
                             { name: '太平老街牛肉麵', category: '美食', lat: 23.5590, lng: 120.6045, description: '在地人推薦的熱呼呼大碗牛肉麵。' },
                             { name: '隆榮商店', category: '伴手禮', lat: 23.5585, lng: 120.6048, description: '充滿懷舊風情的在地雜貨與伴手禮店。' }
                         ];
@@ -532,17 +574,14 @@
                     });
 
                 return () => {
-                    if (mapRef.current) {
-                        mapRef.current.remove();
-                        mapRef.current = null;
-                    }
+                    isMounted = false;
                 };
             }, []);
 
             return <div id="map-container" className="w-full h-full z-0 rounded-2xl relative"></div>;
         }
 
-        function ShopView({ activeShop, setCustomerPoints, addLog, showToast }) {
+        function ShopView({ activeShop, setCustomerPoints, showToast }) {
             const [scanStatus, setScanStatus] = useState('idle'); 
             const [scannedUid, setScannedUid] = useState('');
             const [amount, setAmount] = useState('');
@@ -569,7 +608,7 @@
                         (err) => { }
                     ).catch(err => {
                         console.error(err);
-                        showToast("⚠️ 無法啟動相機，請確認已給予權限！");
+                        showToast("⚠️ 無法啟動相機，請確認已給予瀏覽器鏡頭權限！");
                         setScanStatus('idle');
                     });
                 }
@@ -581,18 +620,14 @@
                 };
             }, [scanStatus]);
 
-            const handleConfirm = () => {
-                setScanStatus('confirm');
-            };
+            const handleConfirm = () => setScanStatus('confirm');
 
             const handleSubmit = () => {
                 if (calculatedPoints <= 0) return;
-                
                 setCustomerPoints(prev => ({ 
                     ...prev, 
                     [activeShop.category]: prev[activeShop.category] + calculatedPoints 
                 }));
-                
                 showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
                 setAmount('');
                 setScanStatus('idle');
@@ -607,18 +642,19 @@
                         </div>
                         
                         {scanStatus === 'idle' && (
-                            <button onClick={() => setScanStatus('scanning')} className="w-full bg-teal-500 text-white font-bold py-12 rounded-2xl text-lg flex flex-col items-center shadow-lg active:scale-95 transition-transform">
+                            <button onClick={() => setScanStatus('scanning')} className="w-full bg-teal-500 text-white font-bold py-12 rounded-2xl text-lg flex flex-col items-center shadow-lg active:scale-95 transition-transform hover:bg-teal-600">
                                 <span className="text-5xl mb-3">📷</span>
-                                點此開啟相機<br/>掃描遊客條碼
+                                點此開啟相機<br/>掃描遊客會員條碼
                             </button>
                         )}
 
                         {scanStatus === 'scanning' && (
                             <div className="animate-fade-in">
-                                <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-inner mb-4">
-                                    <div id="reader" className="w-full"></div>
+                                <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-inner mb-4 relative">
+                                    <div id="reader" className="w-full min-h-[300px]"></div>
+                                    <div className="absolute inset-0 border-4 border-teal-500 rounded-2xl pointer-events-none opacity-50 animate-pulse"></div>
                                 </div>
-                                <button onClick={() => setScanStatus('idle')} className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl active:scale-95">
+                                <button onClick={() => setScanStatus('idle')} className="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-xl active:scale-95 hover:bg-slate-200 transition-colors">
                                     取消掃描
                                 </button>
                             </div>
@@ -626,41 +662,41 @@
 
                         {scanStatus === 'found' && (
                             <div className="space-y-6 animate-fade-in">
-                                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center text-sm font-bold border border-emerald-100 flex flex-col items-center justify-center">
-                                    <span>✅ 已鎖定遊客</span>
-                                    <span className="text-[10px] font-mono mt-1 opacity-70">UID: {scannedUid.substring(0,8)}...</span>
+                                <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center text-sm font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
+                                    <span className="text-lg">✅ 已成功鎖定遊客</span>
+                                    <span className="text-xs font-mono mt-1 opacity-70 bg-white px-2 py-0.5 rounded">UID: {scannedUid.substring(0,8)}...</span>
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-slate-500 text-sm font-bold mb-2 text-center">請輸入本次結帳總金額 (NT$)</label>
+                                    <label className="block text-slate-500 text-sm font-bold mb-3 text-center">請輸入本次結帳總金額 (NT$)</label>
                                     <input 
                                         type="number" value={amount} onChange={(e) => setAmount(e.target.value)} 
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-center font-bold outline-none focus:border-teal-400" 
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-center font-bold outline-none focus:border-teal-400 transition-colors shadow-inner text-slate-800" 
                                         placeholder="0" 
                                     />
                                 </div>
                                 
-                                <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center font-bold border border-teal-100">
-                                    <span className="text-teal-800">換算點數</span>
-                                    <span className="text-3xl text-teal-600">{calculatedPoints} 點</span>
+                                <div className="bg-teal-50 p-5 rounded-2xl flex justify-between items-center font-bold border border-teal-100 shadow-sm">
+                                    <span className="text-teal-800">換算發送點數</span>
+                                    <span className="text-4xl text-teal-600">{calculatedPoints} <span className="text-lg">點</span></span>
                                 </div>
                                 
                                 <div className="flex space-x-3 pt-2">
-                                    <button onClick={() => setScanStatus('idle')} className="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-600 active:scale-95">重來</button>
-                                    <button onClick={handleConfirm} disabled={calculatedPoints<=0} className={`flex-[2] py-4 rounded-2xl font-bold text-white transition-all active:scale-95 ${calculatedPoints > 0 ? 'bg-teal-500' : 'bg-slate-300'}`}>下一步</button>
+                                    <button onClick={() => setScanStatus('idle')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">重來</button>
+                                    <button onClick={handleConfirm} disabled={calculatedPoints<=0} className={`flex-[2] py-4 rounded-2xl font-bold text-white transition-all shadow-md active:scale-95 ${calculatedPoints > 0 ? 'bg-teal-500 hover:bg-teal-600' : 'bg-slate-300'}`}>下一步確認</button>
                                 </div>
                             </div>
                         )}
 
                         {scanStatus === 'confirm' && (
                             <div className="space-y-6 animate-fade-in text-center p-4">
-                                <div className="text-6xl mb-4">🎁</div>
-                                <h3 className="font-bold text-2xl text-slate-800 mb-2">確認發送？</h3>
-                                <p className="text-slate-600">即將發送 <strong className="text-teal-600 text-xl">{calculatedPoints}</strong> 點給該名遊客</p>
+                                <div className="text-6xl mb-4 animate-bounce">🎁</div>
+                                <h3 className="font-extrabold text-2xl text-slate-800 mb-2">確認發送點數？</h3>
+                                <p className="text-slate-600 font-medium bg-slate-50 py-3 rounded-xl">即將發送 <strong className="text-teal-600 text-3xl mx-1">{calculatedPoints}</strong> 點給該名遊客</p>
                                 
                                 <div className="flex space-x-3 mt-8">
-                                    <button onClick={() => setScanStatus('found')} className="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
-                                    <button onClick={handleSubmit} className="flex-[2] py-4 rounded-2xl font-bold text-white bg-rose-500 shadow-md active:scale-95">確認發出</button>
+                                    <button onClick={() => setScanStatus('found')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
+                                    <button onClick={handleSubmit} className="flex-[2] py-4 rounded-2xl font-bold text-white bg-rose-500 hover:bg-rose-600 transition-colors shadow-lg active:scale-95 text-lg">確認送出</button>
                                 </div>
                             </div>
                         )}
