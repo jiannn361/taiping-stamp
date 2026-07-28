@@ -27,10 +27,10 @@
         .bg-gradient-primary { background: linear-gradient(135deg, #ccfbf1 0%, #e0f2fe 100%); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        
-        /* 吐司提示動畫 */
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
+        /* 解決地圖 z-index 問題 */
+        .leaflet-container { z-index: 1 !important; }
     </style>
 </head>
 <body>
@@ -45,7 +45,6 @@
             </svg>
         );
 
-        // 店家權限名單 (綁定 LINE UID)
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '古早味小吃攤', category: 'food', typeName: '小吃', color: 'text-orange-400' },
             'Uabcdef1234567890abcdef1234567890': { id: 'S02', name: '梅山特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
@@ -64,7 +63,6 @@
         function App() {
             const [role, setRole] = useState('customer');
             const [activeShop, setActiveShop] = useState(null);
-            // 預設點數歸零
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0 }); 
             const [logs, setLogs] = useState([]); 
             const [copied, setCopied] = useState(false);
@@ -87,7 +85,6 @@
                             const profile = await liff.getProfile();
                             setUserProfile(profile);
                             
-                            // 自動判斷身分
                             if (SHOP_ADMINS[profile.userId]) {
                                 setRole('shop');
                                 setActiveShop(SHOP_ADMINS[profile.userId]);
@@ -98,7 +95,6 @@
                         }
                     } catch (err) {
                         console.error('LIFF Error', err);
-                        // 測試環境假裝登入
                         setUserProfile({ userId: 'U_GUEST_12345', displayName: '測試遊客' });
                         setIsLiffInit(true); 
                     }
@@ -173,13 +169,14 @@
             const [redeemHistory, setRedeemHistory] = useState([]); 
             const [activeTab, setActiveTab] = useState('card'); 
             const [showBindingModal, setShowBindingModal] = useState(false);
-            const [showQrModal, setShowQrModal] = useState(false);
+            
+            // 新增：申請店家的名稱輸入狀態
+            const [applyShopName, setApplyShopName] = useState('');
 
             const [currentPage, setCurrentPage] = useState(0);
             const scrollContainerRef = useRef(null);
 
             const totalPoints = pointsObj.food + pointsObj.souvenir + pointsObj.stay;
-            const customerName = userProfile ? userProfile.displayName : "訪客"; 
 
             const handleScroll = () => {
                 if (scrollContainerRef.current) {
@@ -232,7 +229,6 @@
                 setStaffPassword('');
             };
 
-            // 處理多頁集點卡輪播
             const renderPages = () => {
                 let stickers = [];
                 for(let i=0; i<pointsObj.food; i++) stickers.push('text-orange-400');
@@ -281,12 +277,6 @@
                     <div className="bg-gradient-primary rounded-b-[40px] pb-8 pt-6 px-4 shadow-sm relative z-10">
                         <div className="flex justify-between items-center text-teal-900 mb-6 px-2">
                             <span className="font-bold text-lg tracking-wider">商圈漫遊集點卡</span>
-                            <button 
-                                onClick={() => setShowQrModal(true)}
-                                className="bg-teal-600 px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-md border border-teal-500 flex items-center active:scale-95 transition-transform"
-                            >
-                                📱 出示條碼
-                            </button>
                         </div>
                         
                         <div className="text-center text-teal-900 mb-4">
@@ -296,25 +286,34 @@
                             </div>
                         </div>
 
+                        {/* 點數卡片區 */}
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl py-5 border border-white/60 shadow-sm mt-4 overflow-hidden relative">
-                            <div 
-                                ref={scrollContainerRef}
-                                onScroll={handleScroll}
-                                className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth"
-                            >
+                            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth">
                                 {pages}
                             </div>
                             
                             {totalPages > 1 && (
                                 <div className="flex justify-center space-x-2 mt-4">
                                     {Array.from({ length: totalPages }).map((_, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            className={`h-2 rounded-full transition-all duration-300 ${currentPage === idx ? 'w-4 bg-teal-600' : 'w-2 bg-teal-200'}`}
-                                        />
+                                        <div key={idx} className={`h-2 rounded-full transition-all duration-300 ${currentPage === idx ? 'w-4 bg-teal-600' : 'w-2 bg-teal-200'}`} />
                                     ))}
                                 </div>
                             )}
+                        </div>
+                        
+                        {/* 🌟 修改點 1：會員條碼直接顯示在集點卡下方 */}
+                        <div className="bg-white rounded-3xl mt-4 p-5 shadow-sm text-center flex flex-col items-center border border-teal-50">
+                            <h3 className="font-bold text-sm text-teal-800 mb-2">出示此條碼給店家發送點數</h3>
+                            <div className="bg-slate-50 p-2 inline-block border-2 border-slate-100 rounded-xl">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${userProfile?.userId || 'GUEST_MODE_UID'}`} 
+                                    alt="QR Code" 
+                                    className="w-32 h-32" 
+                                />
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono mt-2 bg-slate-100 px-2 py-1 rounded">
+                                UID: {userProfile?.userId || '尚未登入 LINE'}
+                            </span>
                         </div>
                     </div>
 
@@ -324,7 +323,6 @@
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>商圈地圖</button>
                     </div>
 
-                    {}
                     {activeTab === 'card' && (
                         <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
@@ -382,37 +380,12 @@
                     )}
 
                     <div className="px-5 mt-12 mb-8 text-center">
-                        <button 
-                            onClick={() => setShowBindingModal(true)}
-                            className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600"
-                        >
+                        <button onClick={() => setShowBindingModal(true)} className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600">
                             我是合作店家，需要開通發送點數權限
                         </button>
                     </div>
 
-                    {}
-                    {showQrModal && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-5 animate-fade-in" onClick={() => setShowQrModal(false)}>
-                            <div className="bg-white rounded-3xl w-full max-w-sm p-8 text-center shadow-2xl relative" onClick={e => e.stopPropagation()}>
-                                <h3 className="font-bold text-xl text-teal-900 mb-2">我的會員條碼</h3>
-                                <p className="text-slate-500 text-sm mb-6">請向店家出示此條碼以獲得點數</p>
-                                <div className="bg-slate-50 p-4 rounded-2xl inline-block border-2 border-slate-100 mb-4">
-                                    <img 
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${userProfile?.userId || 'GUEST_MODE_UID'}`} 
-                                        alt="QR Code" 
-                                        className="w-48 h-48 mx-auto" 
-                                    />
-                                </div>
-                                <div className="text-xs text-slate-400 font-mono bg-slate-100 p-2 rounded-lg break-all">
-                                    {userProfile?.userId || '尚未登入 LINE'}
-                                </div>
-                                <button onClick={() => setShowQrModal(false)} className="mt-6 w-full bg-teal-500 text-white font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
-                                    關閉
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
+                    {/* 兌換大會密碼 Modal */}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -423,10 +396,7 @@
                                     <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
                                     <p className="text-rose-500 font-bold mb-6">將扣除 {redeemModal.cost} 點</p>
                                     <input 
-                                        type="password" 
-                                        placeholder="輸入密碼(8888)"
-                                        value={staffPassword}
-                                        onChange={(e) => setStaffPassword(e.target.value)}
+                                        type="password" placeholder="輸入密碼(8888)" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)}
                                         className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none"
                                     />
                                     <div className="flex space-x-3">
@@ -438,6 +408,7 @@
                         </div>
                     )}
                     
+                    {/* 🌟 修改點 2：店家開通申請，加入店名輸入框 */}
                     {showBindingModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -445,13 +416,23 @@
                                     <h3 className="font-bold text-lg">店家開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4">請將您的專屬代碼傳送給大會工作人員，以開通發送點數的權限。</p>
-                                    <div className="bg-slate-100 p-3 rounded-xl font-mono text-sm text-slate-800 break-all mb-6 font-bold border-2 border-slate-200">
-                                        {userProfile ? userProfile.userId : "無法取得，請確認已登入 LINE"}
+                                    <p className="text-sm text-slate-600 mb-4">請填寫您的店名，並將代碼傳送給大會，以開通發送點數的權限。</p>
+                                    
+                                    <input 
+                                        type="text" 
+                                        placeholder="請輸入您的店名 (如：太平牛肉麵)"
+                                        value={applyShopName}
+                                        onChange={(e) => setApplyShopName(e.target.value)}
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-sm mb-4 outline-none focus:border-teal-400"
+                                    />
+
+                                    <div className="bg-slate-100 p-3 rounded-xl font-mono text-xs text-slate-800 break-all mb-6 font-bold border-2 border-slate-200">
+                                        UID: {userProfile ? userProfile.userId : "無法取得，請確認已登入 LINE"}
                                     </div>
+                                    
                                     <div className="flex flex-col space-y-3">
                                         <a 
-                                            href={`https://line.me/R/msg/text/?你好，我要綁定店家系統，我的專屬代碼是：${userProfile?.userId}`} 
+                                            href={`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName || '未填寫'}%0A我的專屬代碼是：${userProfile?.userId}`} 
                                             target="_blank"
                                             className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center"
                                         >
@@ -474,12 +455,45 @@
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
                 if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿')) return '🏠';
-                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳')) return '🍽️';
+                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳') || cat.includes('麵')) return '🍽️';
                 if (cat.includes('attraction') || cat.includes('景點') || cat.includes('步道')) return '🥾';
                 if (cat.includes('experience') || cat.includes('體驗')) return '✨';
                 if (cat.includes('transport') || cat.includes('交通')) return '🚌';
-                if (cat.includes('gift') || cat.includes('伴手禮')) return '🎁';
+                if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店')) return '🎁';
                 return '📍';
+            };
+
+            // 負責把資料畫到地圖上的核心函數
+            const renderShopsToMap = (map, shops) => {
+                shops.forEach(shop => {
+                    if (shop.lat && shop.lng) {
+                        const emoji = getCategoryEmoji(shop.category);
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div class="w-8 h-8 rounded-full flex items-center justify-center shadow-md text-base" style="background-color: #1f2937; border: 2px solid #e2e8f0; color: white;">${emoji}</div>`,
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32],
+                            popupAnchor: [0, -32]
+                        });
+
+                        const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}`;
+                        
+                        let popupContent = `<div class="font-sans w-48">`;
+                        if (shop.photo) {
+                            popupContent += `<div class="w-full h-24 mb-2 rounded-lg overflow-hidden bg-slate-100"><img src="${shop.photo}" class="w-full h-full object-cover" alt="店家照片" /></div>`;
+                        }
+                        popupContent += `
+                            <strong class="text-teal-700 block text-base mb-1">${shop.name}</strong>
+                            ${shop.category ? `<span class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded">${Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}</span>` : ''}
+                            ${shop.phone ? `<div class="text-xs text-slate-600 mt-1">📞 ${shop.phone}</div>` : ''}
+                            ${shop.address ? `<div class="text-xs text-slate-500 mt-1">📍 ${shop.address}</div>` : ''}
+                            ${shop.description ? `<div class="text-xs text-slate-500 mt-2 line-clamp-2">${shop.description}</div>` : ''}
+                            <a href="${googleMapsLink}" target="_blank" class="block w-full text-center bg-teal-500 text-white text-xs font-bold py-2 rounded-lg mt-3 shadow-sm hover:bg-teal-600">Google 實景導航</a>
+                        </div>`;
+
+                        L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map).bindPopup(popupContent);
+                    }
+                });
             };
 
             useEffect(() => {
@@ -496,49 +510,25 @@
                     attribution: '© OpenStreetMap © CARTO'
                 }).addTo(map);
 
-                // 安全捕捉 API 呼叫，如果本機沒後端就不顯示點點，但保留地圖
+                // 🌟 修改點 3：智慧判斷機制 (預覽環境備用資料)
                 fetch('/api/shops')
                     .then(res => {
-                        if (!res.ok) throw new Error('API 尚未準備好');
+                        if (!res.ok) throw new Error('找不到後端 API');
                         return res.json();
                     })
                     .then(shops => {
-                        if (!Array.isArray(shops)) return;
-                        
-                        shops.forEach(shop => {
-                            if (shop.lat && shop.lng) {
-                                const emoji = getCategoryEmoji(shop.category);
-                                const customIcon = L.divIcon({
-                                    className: 'custom-marker',
-                                    html: `<div class="w-8 h-8 rounded-full flex items-center justify-center shadow-md text-base" style="background-color: #1f2937; border: 2px solid #e2e8f0; color: white;">${emoji}</div>`,
-                                    iconSize: [32, 32],
-                                    iconAnchor: [16, 32],
-                                    popupAnchor: [0, -32]
-                                });
-
-                                const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}`;
-                                
-                                let popupContent = `<div class="font-sans w-48">`;
-                                if (shop.photo) {
-                                    popupContent += `<div class="w-full h-24 mb-2 rounded-lg overflow-hidden bg-slate-100"><img src="${shop.photo}" class="w-full h-full object-cover" alt="店家照片" /></div>`;
-                                }
-                                popupContent += `
-                                    <strong class="text-teal-700 block text-base mb-1">${shop.name}</strong>
-                                    ${shop.category ? `<span class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded">${Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}</span>` : ''}
-                                    ${shop.phone ? `<div class="text-xs text-slate-600 mt-1">📞 ${shop.phone}</div>` : ''}
-                                    ${shop.address ? `<div class="text-xs text-slate-500 mt-1">📍 ${shop.address}</div>` : ''}
-                                    ${shop.description ? `<div class="text-xs text-slate-500 mt-2 line-clamp-2">${shop.description}</div>` : ''}
-                                    <a href="${googleMapsLink}" target="_blank" class="block w-full text-center bg-teal-500 text-white text-xs font-bold py-2 rounded-lg mt-3 shadow-sm hover:bg-teal-600">Google 實景導航</a>
-                                </div>`;
-
-                                L.marker([shop.lat, shop.lng], { icon: customIcon })
-                                    .addTo(map)
-                                    .bindPopup(popupContent, { maxWidth: 220, minWidth: 200 });
-                            }
-                        });
+                        renderShopsToMap(map, shops); // 如果在正式版 Vercel，就畫出 Airtable 真實資料
                     })
                     .catch(err => {
-                        console.warn("📌 目前無店家資料，顯示預設地圖。原因：", err.message);
+                        console.warn("📌 目前在預覽環境，啟用備用測試資料！");
+                        // 這是備用的太平老街店家資料，讓你在預覽模式也能看到地圖運作！
+                        const mockShops = [
+                            { name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。' },
+                            { name: '冬瓜妹', category: '小吃', lat: 23.5588, lng: 120.6052, description: '知名茶葉蛋與特調冬瓜茶。' },
+                            { name: '太平老街牛肉麵', category: '美食', lat: 23.5590, lng: 120.6045, description: '在地人推薦的熱呼呼大碗牛肉麵。' },
+                            { name: '隆榮商店', category: '伴手禮', lat: 23.5585, lng: 120.6048, description: '充滿懷舊風情的在地雜貨與伴手禮店。' }
+                        ];
+                        renderShopsToMap(map, mockShops);
                     });
 
                 return () => {
@@ -553,7 +543,7 @@
         }
 
         function ShopView({ activeShop, setCustomerPoints, addLog, showToast }) {
-            const [scanStatus, setScanStatus] = useState('idle'); // idle, scanning, found, confirm
+            const [scanStatus, setScanStatus] = useState('idle'); 
             const [scannedUid, setScannedUid] = useState('');
             const [amount, setAmount] = useState('');
             const scannerRef = useRef(null);
@@ -561,24 +551,22 @@
             const parsedAmount = parseInt(amount, 10) || 0;
             const calculatedPoints = Math.floor(parsedAmount / 200);
 
-            // 啟動與關閉相機
             useEffect(() => {
                 if (scanStatus === 'scanning') {
                     const scanner = new Html5Qrcode("reader");
                     scannerRef.current = scanner;
                     
                     scanner.start(
-                        { facingMode: "environment" }, // 使用後置鏡頭
+                        { facingMode: "environment" },
                         { fps: 10, qrbox: { width: 250, height: 250 } },
                         (decodedText) => {
-                            // 掃描成功！
                             scanner.stop().then(() => {
                                 setScannedUid(decodedText);
                                 setScanStatus('found');
                                 showToast('✅ 成功鎖定遊客條碼！');
                             });
                         },
-                        (err) => { /* 忽略掃描過程的警告 */ }
+                        (err) => { }
                     ).catch(err => {
                         console.error(err);
                         showToast("⚠️ 無法啟動相機，請確認已給予權限！");
@@ -586,7 +574,6 @@
                     });
                 }
                 
-                // 元件卸載時務必關閉相機，避免記憶體洩漏與發燙
                 return () => {
                     if (scannerRef.current && scannerRef.current.isScanning) {
                         scannerRef.current.stop().catch(e => console.log(e));
@@ -619,15 +606,13 @@
                             <span className="text-xs text-slate-400">發點專員介面</span>
                         </div>
                         
-                        {/* 狀態 1：待命 */}
                         {scanStatus === 'idle' && (
                             <button onClick={() => setScanStatus('scanning')} className="w-full bg-teal-500 text-white font-bold py-12 rounded-2xl text-lg flex flex-col items-center shadow-lg active:scale-95 transition-transform">
                                 <span className="text-5xl mb-3">📷</span>
-                                掃描遊客條碼
+                                點此開啟相機<br/>掃描遊客條碼
                             </button>
                         )}
 
-                        {/* 狀態 2：真實相機掃描中 */}
                         {scanStatus === 'scanning' && (
                             <div className="animate-fade-in">
                                 <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-inner mb-4">
@@ -639,7 +624,6 @@
                             </div>
                         )}
 
-                        {/* 狀態 3：輸入金額 */}
                         {scanStatus === 'found' && (
                             <div className="space-y-6 animate-fade-in">
                                 <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center text-sm font-bold border border-emerald-100 flex flex-col items-center justify-center">
@@ -650,9 +634,7 @@
                                 <div>
                                     <label className="block text-slate-500 text-sm font-bold mb-2 text-center">請輸入本次結帳總金額 (NT$)</label>
                                     <input 
-                                        type="number" 
-                                        value={amount} 
-                                        onChange={(e) => setAmount(e.target.value)} 
+                                        type="number" value={amount} onChange={(e) => setAmount(e.target.value)} 
                                         className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-center font-bold outline-none focus:border-teal-400" 
                                         placeholder="0" 
                                     />
@@ -670,7 +652,6 @@
                             </div>
                         )}
 
-                        {/* 狀態 4：最終確認 (取代原本的 window.confirm) */}
                         {scanStatus === 'confirm' && (
                             <div className="space-y-6 animate-fade-in text-center p-4">
                                 <div className="text-6xl mb-4">🎁</div>
