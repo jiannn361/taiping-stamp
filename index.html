@@ -46,7 +46,7 @@
 
         // 👉 店家開通名單：把申請開通的店家 UID 貼在左邊，右邊填寫他的店名跟發送點數的類別
         const SHOP_ADMINS = {
-            'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
+            'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             '請貼上店家的真實UID': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
@@ -310,6 +310,7 @@
                     <div className="mt-4 mb-2 mx-4 flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-slate-100 p-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-teal-50 rounded-bl-full z-0"></div>
                         <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬掃描條碼</h3>
+                        <p className="text-sm font-bold text-amber-500 mb-1 relative z-10">(消費滿$200可獲得一點)</p>
                         <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家</p>
                         
                         <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10">
@@ -375,8 +376,8 @@
                             
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-sm text-slate-600 space-y-2">
                                 <h3 className="font-bold text-slate-700 mb-3 flex items-center"><span className="text-teal-500 mr-2">✦</span> 活動辦法</h3>
-                                <p>1. 於合作店家消費滿額即可獲贈點數。</p>
-                                <p>2. 點數充足時，請至大會服務台出示手機畫面進行兌換。</p>
+                                <p>1. 於合作店家消費滿$200元即可獲得一點。</p>
+                                <p>2. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
                                 <p className="text-rose-500 font-bold">3. 兌換操作需由大會工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
                                 <p>4. 贈品數量有限，換完為止。</p>
                                 <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 leading-relaxed">
@@ -430,7 +431,7 @@
                                     <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴大會您的店名，然後點擊下方按鈕，將這串專屬代碼複製傳送給我們！</p>
+                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕，將這串專屬代碼複製傳送給我們！</p>
                                     <div className="text-left mb-4">
                                         <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
                                         <input 
@@ -518,7 +519,8 @@
                     const container = document.getElementById('map-container');
                     if (container) container.innerHTML = ''; 
                     
-                    const map = L.map('map-container', { zoomControl: false }).setView([23.559, 120.605], 16);
+                    // 加入 tap: false 解決手機版點擊失效問題
+                    const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
                     
                     // 使用質感 Voyager 地圖底圖
@@ -526,6 +528,11 @@
                         maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
                     }).addTo(map);
                     mapRef.current = map;
+
+                    // 解決地圖剛載入時的灰色破圖 (延遲重新計算大小)
+                    setTimeout(() => {
+                        map.invalidateSize();
+                    }, 250);
                 }
 
                 const map = mapRef.current;
@@ -568,9 +575,9 @@
                             const emoji = getCategoryEmoji(shop.category);
                             const markerBorder = getCategoryColor(shop.category);
                             
-                            // 質感 App 風格標記
+                            // 質感 App 風格標記 (移除 pointer-events 干擾，讓 Leaflet 原生處理點擊)
                             const customHtml = `
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content; pointer-events: auto; cursor: pointer;">
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
                                   <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
                                     <span style="font-size: 18px;">${emoji}</span>
                                   </div>
