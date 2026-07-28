@@ -84,7 +84,7 @@
                             const profile = await liff.getProfile();
                             setUserProfile(profile);
                             // 防呆測試名單，正式上線應由後台資料庫判定
-                            const testAdmins = ['U1234567890abcdef1234567890abcdef']; 
+                            const testAdmins = ['Ucf69096d6b2cbf209d63a7427491b24a']; 
                             if (testAdmins.includes(profile.userId)) {
                                 setRole('shop');
                                 setActiveShop({ id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-orange-400' });
