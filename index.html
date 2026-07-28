@@ -9,9 +9,12 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- LINE LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- Leaflet 地圖 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- QR Code 掃描器 -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
@@ -35,8 +38,20 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🚨 這裡就是貼上 Google Sheets 網址的地方！
+        // 🚨 ========================================== 🚨
+        // 🚨 系統設定區：請在這裡貼上你的網址與店家名單 🚨
+        // 🚨 ========================================== 🚨
+        
         const GOOGLE_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbwJrawcU-ji6p7RJABSbvwMj6NN9Q2sdrK-eJTHF-STZDMZmykBDVC-7bVQGaqvoLTP/exec"; 
+
+        // 👉 店家開通名單：把申請開通的店家 UID 貼在左邊，右邊填寫他的店名跟發送點數的類別
+        const SHOP_ADMINS = {
+            'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
+            '請貼上店家的真實UID': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
+            '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
+        };
+
+        // ========================================== 
 
         const CloudIcon = ({ className }) => (
             <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -47,7 +62,7 @@
         const Toast = ({ message }) => {
             if (!message) return null;
             return (
-                <div className="fixed top-12 left-1/2 z-[9999] bg-slate-800/95 text-white px-6 py-3 rounded-full shadow-2xl animate-slide-down flex items-center space-x-2 whitespace-nowrap font-bold text-sm backdrop-blur-sm border border-slate-600 transform -translate-x-1/2">
+                <div className="fixed top-16 left-1/2 z-[9999] bg-slate-800/95 text-white px-6 py-3 rounded-full shadow-2xl animate-slide-down flex items-center space-x-2 whitespace-nowrap font-bold text-sm backdrop-blur-sm border border-slate-600 transform -translate-x-1/2">
                     <span>{message}</span>
                 </div>
             );
@@ -71,7 +86,7 @@
 
             const showToast = (msg) => {
                 setToastMsg(msg);
-                setTimeout(() => setToastMsg(null), 3000);
+                setTimeout(() => setToastMsg(null), 3500);
             };
 
             useEffect(() => {
@@ -83,11 +98,11 @@
                         } else {
                             const profile = await liff.getProfile();
                             setUserProfile(profile);
-                            // 防呆測試名單，正式上線應由後台資料庫判定
-                            const testAdmins = ['Ucf69096d6b2cbf209d63a7427491b24a']; 
-                            if (testAdmins.includes(profile.userId)) {
+                            
+                            // 判斷是否為合作店家
+                            if (SHOP_ADMINS[profile.userId]) {
                                 setRole('shop');
-                                setActiveShop({ id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-orange-400' });
+                                setActiveShop(SHOP_ADMINS[profile.userId]);
                             } else {
                                 setRole('customer');
                             }
@@ -95,6 +110,7 @@
                         }
                     } catch (err) {
                         console.error('LIFF Error', err);
+                        // 本地預覽模式
                         setUserProfile({ userId: 'U_TEST_MODE_12345', displayName: '測試遊客' });
                         setIsLiffInit(true); 
                     }
@@ -106,7 +122,7 @@
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-teal-600">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-teal-600 mb-4"></div>
-                        <div className="font-bold tracking-wider text-slate-600">載入系統中...</div>
+                        <div className="font-bold tracking-wider text-slate-600">系統載入中...</div>
                     </div>
                 );
             }
@@ -115,16 +131,20 @@
                 <div className="app-container flex flex-col font-sans">
                     <Toast message={toastMsg} />
                     
-                    <div className="bg-slate-800 text-white p-3 flex justify-between items-center text-sm z-50 shadow-md">
-                        <div className="flex items-center space-x-2 font-bold">
+                    {/* 修改過顏色的頂部個人檔案列 */}
+                    <div className="bg-teal-700 text-white p-3 flex justify-between items-center text-sm z-50 shadow-md">
+                        <div className="flex items-center space-x-2 font-bold tracking-wide">
                             {userProfile ? (
                                 <>
-                                    <img src={userProfile.pictureUrl || 'https://placehold.co/100'} alt="Avatar" className="w-7 h-7 rounded-full border border-slate-500" />
+                                    <img src={userProfile.pictureUrl || 'https://placehold.co/100'} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-teal-400 shadow-sm" />
                                     <span>{userProfile.displayName}</span>
                                 </>
                             ) : (
                                 <span>遊客模式</span>
                             )}
+                        </div>
+                        <div className="bg-teal-800 px-3 py-1 rounded-full text-xs border border-teal-600 opacity-80">
+                            {role === 'customer' ? '👣 遊客端' : '🏬 店家端'}
                         </div>
                     </div>
 
@@ -144,7 +164,6 @@
             const [activeTab, setActiveTab] = useState('card'); 
             const [showBindingModal, setShowBindingModal] = useState(false);
             const [applyShopName, setApplyShopName] = useState('');
-            const [showQrModal, setShowQrModal] = useState(false);
             const [selectedShop, setSelectedShop] = useState(null);
 
             const [redeemHistory, setRedeemHistory] = useState(() => {
@@ -212,9 +231,7 @@
                                 time: timeStr
                             })
                         });
-                    } catch(e) {
-                        console.error('上傳 Google Sheets 失敗', e);
-                    }
+                    } catch(e) { console.error(e); }
                 }
 
                 setRedeemModal(null);
@@ -232,9 +249,38 @@
                 setShowBindingModal(false);
             };
 
+            const renderStickers = () => {
+                let stickers = [];
+                for(let i=0; i<pointsObj.food; i++) stickers.push('text-amber-500');
+                for(let i=0; i<pointsObj.souvenir; i++) stickers.push('text-pink-400');
+                for(let i=0; i<pointsObj.stay; i++) stickers.push('text-indigo-500');
+
+                const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
+                const slots = [];
+                
+                for(let i=0; i<totalSlots; i++) {
+                    if (stickers[i]) {
+                        slots.push(
+                            <div key={i} className="relative flex items-center justify-center w-12 h-12 transform hover:scale-110 transition-transform">
+                                <CloudIcon className={`w-14 h-14 ${stickers[i]} absolute z-10 drop-shadow-sm`} />
+                                <span className="z-20 text-white text-xs font-bold pt-1">{i + 1}</span>
+                            </div>
+                        );
+                    } else {
+                        slots.push(
+                            <div key={i} className="relative flex items-center justify-center w-12 h-12 opacity-50">
+                                <CloudIcon className="w-14 h-14 text-white absolute z-10" />
+                                <span className="z-20 text-teal-200 text-xs font-bold pt-1">{i + 1}</span>
+                            </div>
+                        );
+                    }
+                }
+                return slots;
+            };
+
             return (
                 <div className="min-h-full pb-10">
-                    <div className="bg-gradient-primary rounded-b-[40px] pb-8 pt-6 px-4 shadow-sm relative z-10">
+                    <div className="bg-gradient-primary rounded-b-[40px] pb-6 pt-6 px-4 shadow-sm relative z-10">
                         <div className="flex justify-between items-center text-teal-900 mb-6 px-2">
                             <span className="font-bold text-lg tracking-wider">商圈漫遊集點卡</span>
                         </div>
@@ -245,22 +291,42 @@
                                 <span>{totalPoints}</span> <span className="text-2xl font-bold">點</span>
                             </div>
                         </div>
-                        
-                        <div className="text-center mt-6">
-                            <button onClick={() => setShowQrModal(true)} className="bg-teal-700 text-white font-bold px-6 py-3 rounded-full shadow-lg flex items-center justify-center space-x-2 mx-auto hover:bg-teal-800 transition-colors active:scale-95">
-                                <span className="text-xl">📱</span>
-                                <span>出示會員條碼給店家</span>
-                            </button>
+
+                        {/* 雲朵貼紙區 */}
+                        <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4 mx-2">
+                            <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
+                                {renderStickers()}
+                            </div>
+                            
+                            <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-amber-500 mr-1 border border-white/50"></span>小吃</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-pink-400 mr-1 border border-white/50"></span>伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-indigo-500 mr-1 border border-white/50"></span>住宿</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-center space-x-4 mt-6 mb-4 px-2 border-b border-teal-100">
+                    {/* 直覺版：直接顯示在下方的會員條碼區 */}
+                    <div className="mt-4 mb-2 mx-4 flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-slate-100 p-6 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-teal-50 rounded-bl-full z-0"></div>
+                        <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬掃描條碼</h3>
+                        <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家</p>
+                        
+                        <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10">
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${userProfile?.userId || 'GUEST_MODE_UID'}`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
+                        </div>
+                        
+                        <div className="text-[10px] text-slate-400 mt-4 font-mono bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-full text-center break-all relative z-10">
+                            ID: {userProfile?.userId || 'GUEST'}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
                         <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與辦法</button>
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>商圈地圖</button>
                     </div>
 
-                    {}
                     {activeTab === 'card' && (
                         <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
@@ -320,7 +386,6 @@
                         </div>
                     )}
 
-                    {}
                     {activeTab === 'map' && (
                         <div className="px-5 space-y-4 animate-fade-in pb-8">
                            <div className="bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[500px] w-full overflow-hidden relative z-0">
@@ -335,22 +400,7 @@
                         </button>
                     </div>
 
-                    {showQrModal && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex flex-col items-center justify-center p-5 animate-fade-in" onClick={() => setShowQrModal(false)}>
-                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-8 text-center relative" onClick={e => e.stopPropagation()}>
-                                <button onClick={() => setShowQrModal(false)} className="absolute top-4 right-4 bg-slate-100 text-slate-500 w-8 h-8 rounded-full font-bold hover:bg-slate-200">X</button>
-                                <h3 className="font-extrabold text-lg text-slate-700 mb-2">會員專屬條碼</h3>
-                                <p className="text-sm text-slate-500 mb-6">請將此畫面出示給店家進行掃描</p>
-                                <div className="bg-white p-3 inline-block border-2 border-slate-100 rounded-3xl shadow-md mb-2">
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${userProfile?.userId || 'GUEST_MODE_UID'}`} alt="QR Code" className="w-48 h-48 mix-blend-multiply" />
-                                </div>
-                                <div className="text-xs text-slate-400 mt-4 font-mono bg-slate-50 p-2 rounded-lg break-all">
-                                    UID: {userProfile?.userId || 'GUEST'}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
+                    {}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -380,7 +430,7 @@
                                     <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4">填妥下方資料並傳送給大會審核。</p>
+                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴大會您的店名，然後點擊下方按鈕，將這串專屬代碼複製傳送給我們！</p>
                                     <div className="text-left mb-4">
                                         <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
                                         <input 
@@ -400,14 +450,13 @@
                         </div>
                     )}
 
-                    {}
                     {selectedShop && (
-                        <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
+                        <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-center pt-3 pb-2"><div className="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
                                 <button onClick={() => setSelectedShop(null)} className="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 z-10 transition-colors">X</button>
                                 
-                                <div className="overflow-y-auto px-6 pb-8">
+                                <div className="overflow-y-auto px-6 pb-8 pt-2">
                                     {selectedShop.photo && (
                                         <div className="w-full h-48 mt-2 mb-5 rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
                                             <img src={selectedShop.photo} className="w-full h-full object-cover" alt="店家照片" />
@@ -445,21 +494,21 @@
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
-                if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿')) return '🏠';
+                if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿') || cat.includes('stay')) return '🏠';
                 if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳') || cat.includes('麵')) return '🍽️';
                 if (cat.includes('attraction') || cat.includes('景點') || cat.includes('步道')) return '🥾';
                 if (cat.includes('experience') || cat.includes('體驗')) return '✨';
                 if (cat.includes('transport') || cat.includes('交通')) return '🚌';
-                if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店')) return '🎁';
+                if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店') || cat.includes('souvenir')) return '🎁';
                 return '📍';
             };
 
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('小吃') || cat.includes('food') || cat.includes('美食')) return '#f59e0b';
-                if (cat.includes('伴手禮') || cat.includes('gift') || cat.includes('商店')) return '#ec4899';
-                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '#3b82f6';
-                if (cat.includes('景點') || cat.includes('attraction') || cat.includes('步道')) return '#10b981';
+                if (cat.includes('小吃') || cat.includes('food') || cat.includes('美食')) return '#f59e0b'; // Amber
+                if (cat.includes('伴手禮') || cat.includes('gift') || cat.includes('商店') || cat.includes('souvenir')) return '#ec4899'; // Pink
+                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '#3b82f6'; // Blue
+                if (cat.includes('景點') || cat.includes('attraction') || cat.includes('步道')) return '#10b981'; // Emerald
                 return '#1f2937'; 
             };
 
@@ -471,6 +520,8 @@
                     
                     const map = L.map('map-container', { zoomControl: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
+                    
+                    // 使用質感 Voyager 地圖底圖
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                         maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
                     }).addTo(map);
@@ -479,32 +530,37 @@
 
                 const map = mapRef.current;
                 
-                const fetchWithFallback = async () => {
+                const fetchShops = async () => {
                     try {
                         let res = await fetch('/api/shops');
                         if (res.status === 404) res = await fetch('/api/shop');
-                        if (!res.ok) throw new Error(`HTTP 錯誤: ${res.status}`);
-                        const text = await res.text();
-                        try { return JSON.parse(text); } 
-                        catch (e) { throw new Error(`伺服器回傳了無效的資料格式 (可能 Vercel 密碼設定有誤)`); }
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error);
+                        return data;
                     } catch (err) { throw err; }
                 };
 
-                fetchWithFallback().then(shops => {
+                fetchShops().then(shops => {
                     if (!isMounted) return;
                     renderShopsToMap(map, shops);
                 }).catch(err => {
                     if (!isMounted) return;
-                    console.warn("📌 目前在預覽環境或API出錯，載入備用資料！", err);
+                    console.warn("⚠️ 無法取得 Vercel API 資料，載入梅山備用資料", err);
                     const mockShops = [
                         { id:'1', name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。', photo: 'https://placehold.co/400x300/10b981/white?text=Sky+Bridge' },
-                        { id:'2', name: '冬瓜妹', category: '小吃', lat: 23.5588, lng: 120.6052, description: '知名茶葉蛋與特調冬瓜茶。', photo: 'https://placehold.co/400x300/f59e0b/white?text=Tea+Eggs' },
-                        { id:'3', name: '太平老街牛肉麵', category: '美食', lat: 23.5590, lng: 120.6045, description: '在地人推薦的熱呼呼大碗牛肉麵。' }
+                        { id:'2', name: '老街特色小吃', category: '小吃', lat: 23.5588, lng: 120.6052, description: '在地熱門特色小吃，香氣四溢。', photo: 'https://placehold.co/400x300/f59e0b/white?text=Food' },
+                        { id:'3', name: '伴手禮名店', category: '伴手禮', lat: 23.5590, lng: 120.6045, description: '梅山必買特產伴手禮。', photo: 'https://placehold.co/400x300/ec4899/white?text=Gift' }
                     ];
                     renderShopsToMap(map, mockShops);
                 });
 
                 const renderShopsToMap = (mapInstance, shopsData) => {
+                    // 清除舊標記
+                    mapInstance.eachLayer((layer) => {
+                        if (layer instanceof L.Marker) { mapInstance.removeLayer(layer); }
+                    });
+
                     const bounds = [];
                     shopsData.forEach(shop => {
                         if (shop.lat && shop.lng) {
@@ -512,6 +568,7 @@
                             const emoji = getCategoryEmoji(shop.category);
                             const markerBorder = getCategoryColor(shop.category);
                             
+                            // 質感 App 風格標記
                             const customHtml = `
                                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content; pointer-events: auto; cursor: pointer;">
                                   <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
@@ -548,7 +605,7 @@
             const scannerRef = useRef(null);
 
             const parsedAmount = parseInt(amount, 10) || 0;
-            const calculatedPoints = Math.floor(parsedAmount / 200);
+            const calculatedPoints = Math.floor(parsedAmount / 200); // 滿200發1點
 
             useEffect(() => {
                 if (scanStatus === 'scanning') {
@@ -619,7 +676,7 @@
                             <div className="space-y-6 animate-fade-in">
                                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center text-sm font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
                                     <span className="text-lg">✅ 已成功鎖定遊客</span>
-                                    <span className="text-xs font-mono mt-1 opacity-70 bg-white px-2 py-0.5 rounded">UID: {scannedUid.substring(0,8)}...</span>
+                                    <span className="text-xs font-mono mt-1 opacity-70 bg-white px-2 py-0.5 rounded">UID: {scannedUid.substring(0,10)}...</span>
                                 </div>
                                 
                                 <div>
