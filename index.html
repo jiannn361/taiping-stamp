@@ -47,7 +47,7 @@
         // 店家清單設定
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
-            'U37c32d14410792ae9cba2d05d7189512': { id: 'S02', name: '太平雲梯', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
+            'U37c32d14410792ae9cba2d05d7189513': { id: 'S02', name: '太平雲梯', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
@@ -329,7 +329,7 @@
                     <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
                         <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與辦法</button>
-                        <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>商圈地圖</button>
+                        <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                     </div>
 
                     {activeTab === 'card' && (
