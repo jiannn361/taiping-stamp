@@ -178,7 +178,7 @@
                 };
                 
                 fetchPoints(); 
-                const interval = setInterval(fetchPoints, 3000); 
+                const interval = setInterval(fetchPoints, 15000); 
                 
                 return () => { isMounted = false; clearInterval(interval); };
             }, [userProfile]);
