@@ -44,15 +44,12 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🚨 ========================================== 🚨
-        const GOOGLE_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbwngu91FCMtJ1FlHZbO33cTgHiHeCLfTCZ4bzB_BSe51S0SUwvJqnV_7Usg-8NubcYA/exec"; 
-
+        // 店家清單設定
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
-        // 🚨 ========================================== 🚨
 
         const CloudIcon = ({ className }) => (
             <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -206,7 +203,10 @@
                     return;
                 }
                 
-                showToast('⏳ 系統處理中...');
+                showToast('⏳ 系統處理中，寫入雲端紀錄...');
+
+                const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
+                const timeStr = new Date().toLocaleString('zh-TW');
 
                 try {
                     const res = await fetch('/api/points', {
@@ -214,44 +214,28 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             uid: userProfile?.userId || 'GUEST_MODE_UID',
+                            userName: userProfile?.displayName || '遊客',
                             action: 'deduct',
-                            points: redeemModal.cost
+                            points: redeemModal.cost,
+                            giftName: redeemModal.name,
+                            sn: serialNumber,
+                            time: timeStr
                         })
                     });
 
                     if (!res.ok) {
-                        showToast('❌ 扣點失敗，可能是點數已被使用。');
+                        const err = await res.json();
+                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
                         return;
                     }
 
-                    const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
-                    const timeStr = new Date().toLocaleString('zh-TW');
-
                     setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
-                    showToast('✅ 核銷成功！請將贈品交給遊客。');
-                    
-                    if (GOOGLE_SHEET_WEBHOOK && GOOGLE_SHEET_WEBHOOK.startsWith('http')) {
-                        try {
-                            fetch(GOOGLE_SHEET_WEBHOOK, {
-                                method: 'POST',
-                                mode: 'no-cors',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    uid: userProfile ? userProfile.userId : '未知遊客',
-                                    name: userProfile ? userProfile.displayName : '遊客',
-                                    gift: redeemModal.name,
-                                    points: redeemModal.cost,
-                                    sn: serialNumber,
-                                    time: timeStr
-                                })
-                            });
-                        } catch(e) { console.error(e); }
-                    }
+                    showToast('✅ 核銷成功！已同步至 Airtable 兌換紀錄。');
 
                     setRedeemModal(null);
                     setStaffPassword('');
                 } catch(e) {
-                    showToast('❌ 系統異常，請稍後再試。');
+                    showToast('❌ 連線異常，請稍後再試。');
                 }
             };
 
@@ -295,6 +279,10 @@
                 return slots;
             };
 
+            const uidString = userProfile?.userId || 'GUEST_MODE_UID';
+            const nameString = userProfile?.displayName || '遊客';
+            const qrData = encodeURIComponent(`${uidString}|${nameString}`);
+
             return (
                 <div className="min-h-full pb-10">
                     <div className="bg-gradient-primary rounded-b-[40px] pb-6 pt-6 px-4 shadow-sm relative z-10">
@@ -327,7 +315,6 @@
                         </div>
                     </div>
 
-                    {}
                     <div className="mt-4 mb-2 mx-4 flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-slate-100 p-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-teal-50 rounded-bl-full z-0"></div>
                         <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬掃描條碼</h3>
@@ -335,8 +322,7 @@
                         <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家</p>
                         
                         <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10">
-                            {/* 💡 包含 UID 與 名字，供店家鎖定 */}
-                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent((userProfile?.userId || 'GUEST_MODE_UID') + '|' + (userProfile?.displayName || '遊客'))}`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
                         </div>
                     </div>
 
@@ -469,7 +455,6 @@
                         </div>
                     )}
 
-                    {}
                     {selectedShop && (
                         <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>

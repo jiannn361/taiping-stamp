@@ -2,8 +2,8 @@ export default async function handler(req, res) {
     const apiKey = process.env.AIRTABLE_API_KEY;
     const baseId = process.env.AIRTABLE_BASE_ID;
     
-    // 🚨 注意：等一下要在 Airtable 建立這個資料表
     const tableName = '遊客點數'; 
+    const historyTableName = '兌換紀錄'; // 🌟 新增的兌換紀錄資料表
 
     if (!apiKey || !baseId) {
         return res.status(500).json({ error: '遺失環境變數' });
@@ -14,7 +14,6 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
     };
 
-    // 🌟 遊客端：查詢目前點數
     if (req.method === 'GET') {
         const uid = req.query.uid;
         if (!uid) return res.status(400).json({ error: '缺少 UID' });
@@ -32,20 +31,19 @@ export default async function handler(req, res) {
                     stay: fields['住宿'] || 0
                 });
             } else {
-                return res.status(200).json({ food: 0, souvenir: 0, stay: 0 }); // 新遊客點數為 0
+                return res.status(200).json({ food: 0, souvenir: 0, stay: 0 }); 
             }
         } catch (e) {
             return res.status(500).json({ error: e.message });
         }
     }
 
-    // 🌟 店家/服務台端：發送或扣除點數
     if (req.method === 'POST') {
-        const { uid, action, category, points, userName } = req.body;
+        const { uid, action, category, points, userName, giftName, sn, time } = req.body;
         if (!uid) return res.status(400).json({ error: '缺少 UID' });
 
         try {
-            // 1. 先去資料庫找這個遊客
+            // 1. 查詢遊客點數
             const searchUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}?filterByFormula={UID}='${uid}'`;
             const searchRes = await fetch(searchUrl, { headers });
             const searchData = await searchRes.json();
@@ -53,10 +51,7 @@ export default async function handler(req, res) {
             let recordId = null;
             let currentFields = { 'UID': uid, '小吃': 0, '伴手禮': 0, '住宿': 0 };
             
-            // 如果前端有傳名字過來，就一起存起來
-            if (userName) {
-                currentFields['名稱'] = userName;
-            }
+            if (userName) currentFields['名稱'] = userName;
 
             if (searchData.records && searchData.records.length > 0) {
                 recordId = searchData.records[0].id;
@@ -65,7 +60,7 @@ export default async function handler(req, res) {
                 currentFields['住宿'] = searchData.records[0].fields['住宿'] || 0;
             }
 
-            // 2. 計算最新點數 (發放 or 扣除)
+            // 2. 點數加減計算
             if (action === 'add') {
                 const colMap = { 'food': '小吃', 'souvenir': '伴手禮', 'stay': '住宿' };
                 const colName = colMap[category];
@@ -87,12 +82,11 @@ export default async function handler(req, res) {
                 if (ptsToDeduct > 0) return res.status(400).json({ error: '點數不足' });
             }
 
-            // 3. 把新點數寫回 Airtable
+            // 3. 寫回點數
             let saveUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
             let saveMethod = 'POST';
             let saveBody = { records: [{ fields: currentFields }] };
 
-            // 如果遊客已經存在，改用 PATCH 更新
             if (recordId) {
                 saveUrl = `${saveUrl}/${recordId}`;
                 saveMethod = 'PATCH';
@@ -105,11 +99,30 @@ export default async function handler(req, res) {
                 body: JSON.stringify(saveBody)
             });
             
-            // 🚨 升級錯誤攔截：抓出 Airtable 拒絕的真正原因
             if (!saveRes.ok) {
                 const errData = await saveRes.json();
-                console.error("Airtable 拒絕寫入:", errData);
-                return res.status(400).json({ error: `Airtable 錯誤: ${errData.error?.type || errData.error?.message || '格式不符'}` });
+                return res.status(400).json({ error: `Airtable 錯誤: ${errData.error?.type || '格式不符'}` });
+            }
+
+            // 🌟 4. 如果是兌換(扣點)，則寫入「兌換紀錄」資料表
+            if (action === 'deduct') {
+                const historyUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(historyTableName)}`;
+                await fetch(historyUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        records: [{
+                            fields: {
+                                '時間': time || new Date().toLocaleString('zh-TW'),
+                                'UID': uid,
+                                '名稱': userName || '遊客',
+                                '兌換獎品': giftName || '未知獎品',
+                                '扣除點數': points,
+                                '核銷序號': sn || ''
+                            }
+                        }]
+                    })
+                });
             }
 
             return res.status(200).json({ success: true });
