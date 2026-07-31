@@ -107,18 +107,22 @@ export default async function handler(req, res) {
             // 🌟 4. 如果是兌換(扣點)，則寫入「兌換紀錄」資料表
             if (action === 'deduct') {
                 const historyUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(historyTableName)}`;
+                
+                // 🛡️ 強制伺服器端使用台灣時間 (避免變成英國 UTC 時間)
+                const taiwanTime = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+
                 await fetch(historyUrl, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({
                         records: [{
                             fields: {
-                                '時間': time || new Date().toLocaleString('zh-TW'),
+                                '時間': time || taiwanTime,
                                 'UID': uid,
-                                '名稱': userName || '遊客',
+                                '名稱': userName || '未知遊客',
                                 '兌換獎品': giftName || '未知獎品',
                                 '扣除點數': points,
-                                '核銷序號': sn || ''
+                                '核銷序號': sn || '未產生'
                             }
                         }]
                     })
