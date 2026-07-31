@@ -3,19 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- 🌟 更新：網頁標題 -->
     <title>雲遊太平電子護照</title>
     
-    <!-- 🌟 PWA 安裝設定 -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f766e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="雲遊太平">
-    
-    <!-- 🌟 讀取自訂的桌面圖示 -->
     <link rel="apple-touch-icon" href="icon-192.png">
-    <!-- 網頁標籤圖示預設為雲朵 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☁️</text></svg>">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,6 +18,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -38,8 +34,6 @@
         .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
         .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        
-        /* 解決地圖被遮擋與圖示互動的問題 */
         .leaflet-container { z-index: 1 !important; }
         .custom-map-marker { background: none !important; border: none !important; pointer-events: auto !important; }
     </style>
@@ -51,10 +45,10 @@
         const { useState, useEffect, useRef } = React;
 
         // 🚨 ========================================== 🚨
-        const GOOGLE_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbwJrawcU-ji6p7RJABSbvwMj6NN9Q2sdrK-eJTHF-STZDMZmykBDVC-7bVQGaqvoLTP/exec"; 
+        const GOOGLE_SHEET_WEBHOOK = "請貼上你的Google表單網址"; 
 
         const SHOP_ADMINS = {
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S01', name: '測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
+            'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
@@ -145,7 +139,7 @@
                     <div className="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar relative">
                         {role === 'customer' 
                             ? <CustomerView userProfile={userProfile} showToast={showToast} /> 
-                            : <ShopView activeShop={activeShop} showToast={showToast} userProfile={userProfile} />
+                            : <ShopView activeShop={activeShop} showToast={showToast} />
                         }
                     </div>
                 </div>
@@ -264,7 +258,7 @@
             const handleApplyBinding = (e) => {
                 e.preventDefault();
                 if (!applyShopName || applyShopName.trim() === '') {
-                    showToast('❌ 請輸入真實店名才能申請');
+                    showToast('❌ 請輸入店名');
                     return;
                 }
                 const url = `https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的專屬代碼是：${userProfile?.userId}`;
@@ -333,6 +327,7 @@
                         </div>
                     </div>
 
+                    {}
                     <div className="mt-4 mb-2 mx-4 flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-slate-100 p-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-teal-50 rounded-bl-full z-0"></div>
                         <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬掃描條碼</h3>
@@ -340,7 +335,7 @@
                         <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家</p>
                         
                         <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10">
-                            {/* 💡 將 UID 與名字用 | 串接起來產生 QR Code 讓店家掃描 */}
+                            {/* 💡 包含 UID 與 名字，供店家鎖定 */}
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent((userProfile?.userId || 'GUEST_MODE_UID') + '|' + (userProfile?.displayName || '遊客'))}`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
                         </div>
                     </div>
@@ -474,6 +469,7 @@
                         </div>
                     )}
 
+                    {}
                     {selectedShop && (
                         <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>
@@ -543,76 +539,77 @@
                     const container = document.getElementById('map-container');
                     if (container) container.innerHTML = ''; 
                     
-                    setTimeout(() => {
-                        if (!document.getElementById('map-container') || mapRef.current) return;
-                        const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
-                        L.control.zoom({ position: 'bottomright' }).addTo(map);
-                        
-                        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                            maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
-                        }).addTo(map);
-                        mapRef.current = map;
+                    const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
+                    L.control.zoom({ position: 'bottomright' }).addTo(map);
+                    
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
+                    }).addTo(map);
+                    mapRef.current = map;
 
-                        const fetchShops = async () => {
-                            try {
-                                let res = await fetch('/api/shops');
-                                if (res.status === 404) res = await fetch('/api/shop');
-                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                const data = await res.json();
-                                if (data.error) throw new Error(data.error);
-                                return data;
-                            } catch (err) { throw err; }
-                        };
+                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
+                }
 
-                        fetchShops().then(shops => {
-                            if (!isMounted) return;
-                            renderShopsToMap(map, shops);
-                        }).catch(err => {
-                            if (!isMounted) return;
-                            const mockShops = [
-                                { id:'1', name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。' },
-                                { id:'2', name: '老街特色小吃', category: '小吃', lat: 23.5588, lng: 120.6052, description: '在地熱門特色小吃，香氣四溢。' },
-                            ];
-                            renderShopsToMap(map, mockShops);
+                if (activeTab === 'map' && mapRef.current) {
+                    const map = mapRef.current;
+                    
+                    const fetchShops = async () => {
+                        try {
+                            let res = await fetch('/api/shops');
+                            if (res.status === 404) res = await fetch('/api/shop');
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            const data = await res.json();
+                            if (data.error) throw new Error(data.error);
+                            return data;
+                        } catch (err) { throw err; }
+                    };
+
+                    fetchShops().then(shops => {
+                        if (!isMounted) return;
+                        renderShopsToMap(map, shops);
+                    }).catch(err => {
+                        if (!isMounted) return;
+                        const mockShops = [
+                            { id:'1', name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。' },
+                            { id:'2', name: '老街特色小吃', category: '小吃', lat: 23.5588, lng: 120.6052, description: '在地熱門特色小吃，香氣四溢。' },
+                        ];
+                        renderShopsToMap(map, mockShops);
+                    });
+
+                    const renderShopsToMap = (mapInstance, shopsData) => {
+                        mapInstance.eachLayer((layer) => {
+                            if (layer instanceof L.Marker) { mapInstance.removeLayer(layer); }
                         });
 
-                        const renderShopsToMap = (mapInstance, shopsData) => {
-                            mapInstance.eachLayer((layer) => {
-                                if (layer instanceof L.Marker) { mapInstance.removeLayer(layer); }
-                            });
+                        const bounds = [];
+                        shopsData.forEach(shop => {
+                            if (shop.lat && shop.lng) {
+                                bounds.push([shop.lat, shop.lng]);
+                                const emoji = getCategoryEmoji(shop.category);
+                                const markerBorder = getCategoryColor(shop.category);
+                                
+                                const customHtml = `
+                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
+                                      <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
+                                        <span style="font-size: 18px;">${emoji}</span>
+                                      </div>
+                                      <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(4px); white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
+                                        ${shop.name}
+                                      </div>
+                                    </div>
+                                `;
 
-                            const bounds = [];
-                            shopsData.forEach(shop => {
-                                if (shop.lat && shop.lng) {
-                                    bounds.push([shop.lat, shop.lng]);
-                                    const emoji = getCategoryEmoji(shop.category);
-                                    const markerBorder = getCategoryColor(shop.category);
-                                    
-                                    const customHtml = `
-                                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
-                                          <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
-                                            <span style="font-size: 18px;">${emoji}</span>
-                                          </div>
-                                          <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(4px); white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
-                                            ${shop.name}
-                                          </div>
-                                        </div>
-                                    `;
+                                const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
+                                
+                                const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(mapInstance);
+                                marker.on('click', () => {
+                                    if(onMarkerClick) onMarkerClick(shop);
+                                });
+                            }
+                        });
 
-                                    const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
-                                    
-                                    const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(mapInstance);
-                                    marker.on('click', () => {
-                                        if(onMarkerClick) onMarkerClick(shop);
-                                    });
-                                }
-                            });
-
-                            if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-                        };
-                        
-                        setTimeout(() => map.invalidateSize(), 300);
-                    }, 100); 
+                        if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+                    };
                 }
 
                 return () => { isMounted = false; };
@@ -674,7 +671,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             uid: scannedUid,
-                            userName: scannedName,
+                            userName: scannedName, 
                             action: 'add',
                             category: activeShop.category,
                             points: calculatedPoints
@@ -686,11 +683,12 @@
                         setAmount('');
                         setScanStatus('idle');
                     } else {
-                        showToast(`❌ 發送失敗，請重試！`);
+                        const errData = await res.json();
+                        showToast(`❌ 發送失敗: ${errData.error || '未知的系統錯誤'}`);
                         setScanStatus('found');
                     }
                 } catch (e) {
-                    showToast(`❌ 連線異常！`);
+                    showToast(`❌ 連線異常！請檢查網路狀態。`);
                     setScanStatus('found');
                 }
             };
@@ -730,12 +728,12 @@
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-slate-500 text-sm mb-2 font-bold text-center">輸入本次結帳總金額 (NT$)</label>
+                                    <label className="block text-slate-600 text-sm mb-2 font-bold text-center">請輸入本次結帳總金額 (NT$)</label>
                                     <input 
                                         type="number" 
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-slate-800 font-bold text-center focus:outline-none focus:border-teal-400 transition-colors shadow-inner"
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-slate-800 font-bold text-center outline-none focus:border-teal-400 transition-colors shadow-inner"
                                         placeholder="0"
                                     />
                                 </div>
@@ -746,7 +744,7 @@
                                 </div>
                                 
                                 <div className="flex space-x-3 pt-2">
-                                    <button onClick={() => {setScanStatus('idle'); setAmount('');}} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">重來</button>
+                                    <button onClick={() => setScanStatus('idle')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">重來</button>
                                     <button onClick={() => setScanStatus('confirm')} disabled={calculatedPoints<=0} className={`flex-[2] py-4 rounded-2xl font-bold text-white transition-all shadow-md active:scale-95 ${calculatedPoints > 0 ? 'bg-teal-500 hover:bg-teal-600' : 'bg-slate-300'}`}>下一步確認</button>
                                 </div>
                             </div>

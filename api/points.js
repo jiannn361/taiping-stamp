@@ -105,7 +105,12 @@ export default async function handler(req, res) {
                 body: JSON.stringify(saveBody)
             });
             
-            if (!saveRes.ok) throw new Error('寫入失敗');
+            // 🚨 升級錯誤攔截：抓出 Airtable 拒絕的真正原因
+            if (!saveRes.ok) {
+                const errData = await saveRes.json();
+                console.error("Airtable 拒絕寫入:", errData);
+                return res.status(400).json({ error: `Airtable 錯誤: ${errData.error?.type || errData.error?.message || '格式不符'}` });
+            }
 
             return res.status(200).json({ success: true });
         } catch (e) {
