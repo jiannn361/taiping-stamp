@@ -28,10 +28,11 @@ export default async function handler(req, res) {
                 return res.status(200).json({
                     food: fields['小吃'] || 0,
                     souvenir: fields['伴手禮'] || 0,
-                    stay: fields['住宿'] || 0
+                    stay: fields['住宿'] || 0,
+                    name: fields['名稱'] || '未知遊客'
                 });
             } else {
-                return res.status(200).json({ food: 0, souvenir: 0, stay: 0 }); 
+                return res.status(200).json({ food: 0, souvenir: 0, stay: 0, name: '新遊客' }); 
             }
         } catch (e) {
             return res.status(500).json({ error: e.message });
