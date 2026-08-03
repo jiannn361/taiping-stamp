@@ -46,7 +46,7 @@
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S03', name: '測試民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
+            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
         const CloudIcon = ({ className }) => (
@@ -721,13 +721,16 @@
                                             {manualCode || <span className="text-slate-300 tracking-normal text-lg font-sans">點擊下方鍵盤</span>}
                                         </div>
 
-                                        {/* 🌟 專屬 16 進位英數鍵盤 (左英右數) */}
-                                        <div className="grid grid-cols-4 gap-2 mb-2">
-                                            {['A','1','2','3', 'B','4','5','6', 'C','7','8','9', 'D','E','F','0'].map(key => (
+                                        {/* 🌟 專屬 16 進位英數鍵盤 (3直行排列) */}
+                                        <div className="grid grid-cols-3 gap-2 mb-2">
+                                            {['A','B','C', 'D','E','F', '1','2','3', '4','5','6', '7','8','9'].map(key => (
                                                 <button key={key} onClick={() => handleCodePad(key)} className="bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">
                                                     {key}
                                                 </button>
                                             ))}
+                                            <button onClick={() => handleCodePad('0')} className="col-start-2 bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">
+                                                0
+                                            </button>
                                         </div>
                                         <div className="mb-4">
                                             <button onClick={() => handleCodePad('delete')} className="w-full bg-slate-200 py-3 rounded-xl text-lg font-extrabold text-slate-600 shadow-sm border border-slate-300 active:bg-slate-300 active:scale-95 transition-all flex justify-center items-center">
