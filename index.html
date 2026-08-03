@@ -45,7 +45,7 @@
 
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
+            '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
@@ -171,7 +171,7 @@
                 };
                 
                 fetchPoints(); 
-                const interval = setInterval(fetchPoints, 15000); 
+                const interval = setInterval(fetchPoints, 10000); 
                 
                 return () => { isMounted = false; clearInterval(interval); };
             }, [shortUid]);
@@ -539,7 +539,6 @@
             const [amount, setAmount] = useState('');
             const scannerRef = useRef(null);
 
-            // 🛡️ 新增：防呆防護網狀態
             const [isQuerying, setIsQuerying] = useState(false);
             const [recentRecords, setRecentRecords] = useState([]);
             const [cooldowns, setCooldowns] = useState({});
@@ -583,7 +582,6 @@
                 };
             }, [scanStatus, inputMode]);
 
-            // 🛡️ 升級功能：手動輸入時去資料庫查名字
             const handleManualSearch = async () => {
                 if (manualCode.length < 6) return;
                 setIsQuerying(true);
@@ -610,11 +608,11 @@
                 }
             };
 
-            // 🛡️ 第一道防護網：2 分鐘冷卻檢查
             const proceedToConfirm = () => {
                 const lastTime = cooldowns[scannedUid];
+                // 防護網一：2分鐘防連點鎖定
                 if (lastTime && (Date.now() - lastTime) < 2 * 60 * 1000) {
-                    showToast('❌ 錯誤：2 分鐘內已發送過點數給此遊客，為防重複扣款系統已鎖定！');
+                    showToast('❌ 錯誤：2 分鐘內已發送過點數，系統啟動防重複保護！');
                     return;
                 }
                 setScanStatus('confirm');
@@ -645,7 +643,6 @@
                     if (res.ok) {
                         showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
                         
-                        // 🛡️ 第三道防護網：紀錄剛剛發送的歷史與冷卻時間
                         const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         setRecentRecords(prev => [{ time: timeStr, uid: scannedUid, name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
                         setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
@@ -660,6 +657,17 @@
                 } catch (e) {
                     showToast(`❌ 連線異常！請檢查網路狀態。`);
                     setScanStatus('found');
+                }
+            };
+
+            // 🌟 專屬 POS 收銀機自訂數字鍵盤邏輯
+            const handleNumpad = (val) => {
+                if (val === 'delete') {
+                    setAmount(prev => prev.slice(0, -1));
+                } else if (val === '00') {
+                    setAmount(prev => (prev === '' || prev === '0') ? '0' : prev + '00');
+                } else {
+                    setAmount(prev => (prev === '0') ? val : prev + val);
                 }
             };
 
@@ -701,10 +709,14 @@
                                         <input 
                                             type="text" 
                                             maxLength="6"
-                                            placeholder="例如: A1B2C3"
+                                            placeholder="如: A1B2C3"
                                             value={manualCode}
                                             onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                                            className="w-full bg-white border-2 border-slate-300 rounded-2xl px-4 py-4 text-3xl font-mono text-teal-600 font-bold text-center tracking-[0.3em] outline-none focus:border-teal-400 transition-colors mb-6 shadow-sm uppercase placeholder:tracking-normal placeholder:text-slate-300 placeholder:text-xl"
+                                            autoCapitalize="characters"
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                            spellCheck="false"
+                                            className="w-full bg-white border-2 border-slate-300 rounded-2xl px-4 py-4 text-4xl font-mono text-teal-600 font-extrabold text-center tracking-[0.2em] outline-none focus:border-teal-400 transition-colors mb-6 shadow-sm uppercase placeholder:tracking-normal placeholder:text-slate-300 placeholder:text-2xl placeholder:font-sans"
                                         />
                                         <button 
                                             disabled={manualCode.length < 6 || isQuerying}
@@ -731,24 +743,40 @@
                         )}
 
                         {scanStatus === 'found' && (
-                            <div className="space-y-6 animate-fade-in">
-                                <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center text-sm font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
+                            <div className="space-y-4 animate-fade-in">
+                                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
                                     <span className="text-lg">✅ 已鎖定：{scannedName}</span>
-                                    <span className="text-sm font-mono mt-1 opacity-80 bg-white px-3 py-1 rounded-full border border-emerald-100">代碼: {scannedUid}</span>
+                                    <span className="text-xs font-mono mt-1 opacity-80 bg-white px-3 py-1 rounded-full border border-emerald-100">UID: {scannedUid}</span>
                                 </div>
                                 
-                                <div>
-                                    <label className="block text-slate-600 text-sm mb-2 font-bold text-center">請輸入本次結帳總金額 (NT$)</label>
-                                    <input 
-                                        type="number" 
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-4 text-3xl text-slate-800 font-bold text-center outline-none focus:border-teal-400 transition-colors shadow-inner"
-                                        placeholder="0"
-                                    />
+                                {/* 🌟 升級版：POS 收銀機專用大鍵盤 */}
+                                <div className="bg-slate-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
+                                    <div className="text-center mb-4">
+                                        <div className="text-slate-500 text-sm font-bold mb-1">本次結帳總金額 (NT$)</div>
+                                        <div className="text-5xl font-extrabold text-slate-800 tracking-tight h-14 flex items-center justify-center">
+                                            {amount || '0'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 gap-3 mb-2">
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                                            <button key={num} onClick={() => handleNumpad(num.toString())} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
+                                                {num}
+                                            </button>
+                                        ))}
+                                        <button onClick={() => handleNumpad('00')} className="bg-white py-4 rounded-2xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
+                                            00
+                                        </button>
+                                        <button onClick={() => handleNumpad('0')} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
+                                            0
+                                        </button>
+                                        <button onClick={() => handleNumpad('delete')} className="bg-slate-200 py-4 rounded-2xl text-2xl font-extrabold text-slate-600 shadow-sm border border-slate-300 active:bg-slate-300 active:scale-95 transition-all flex justify-center items-center">
+                                            ⌫
+                                        </button>
+                                    </div>
                                 </div>
                                 
-                                <div className="bg-teal-50 p-5 rounded-2xl flex justify-between items-center font-bold border border-teal-100 shadow-sm">
+                                <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center font-bold border border-teal-100 shadow-sm">
                                     <span className="text-teal-800">換算發送點數</span>
                                     <span className="text-4xl text-teal-600">{calculatedPoints} <span className="text-lg">點</span></span>
                                 </div>
@@ -766,11 +794,11 @@
                                 <h3 className="font-extrabold text-2xl text-slate-800 mb-2">確認發送點數？</h3>
                                 <p className="text-slate-600 font-medium bg-slate-50 py-3 rounded-xl border border-slate-100 mb-4">即將發送 <strong className="text-teal-600 text-3xl mx-1">{calculatedPoints}</strong> 點給該遊客</p>
                                 
-                                {/* 🛡️ 第二道防護網：異常大額警告 */}
+                                {/* 🛡️ 防護網二：大額點數警告 (大於等於 10 點) */}
                                 {calculatedPoints >= 10 && (
                                     <div className="bg-rose-50 border-2 border-rose-200 p-4 rounded-xl animate-pulse">
                                         <p className="text-rose-600 font-bold text-sm">⚠️ 系統防呆警告</p>
-                                        <p className="text-rose-500 text-xs mt-1">單筆發送達 {calculatedPoints} 點 (消費大於 {parsedAmount} 元)。請再次確認金額是否輸入錯誤？</p>
+                                        <p className="text-rose-500 text-xs mt-1">單筆發送達 {calculatedPoints} 點 (消費 {parsedAmount} 元)。請再次確認金額是否輸入錯誤？</p>
                                     </div>
                                 )}
                                 
@@ -782,7 +810,7 @@
                         )}
                     </div>
 
-                    {/* 🛡️ 第三道防護網：剛剛發送的歷史紀錄區塊 */}
+                    {/* 🛡️ 防護網三：最近發送紀錄 */}
                     {scanStatus === 'idle' && recentRecords.length > 0 && (
                         <div className="mt-6 bg-white rounded-3xl p-5 shadow-sm border border-slate-100 animate-slide-up">
                             <h3 className="text-sm font-bold text-slate-600 mb-3 flex items-center">
