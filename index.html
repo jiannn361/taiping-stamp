@@ -11,8 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="雲遊太平">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☁️</text></svg>">
-
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -44,10 +43,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 店家清單設定
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
-            'U37c32d14410792ae9cba2d05d7189513': { id: 'S02', name: '太平雲梯', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
+            '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
@@ -97,7 +95,7 @@
                             setIsLiffInit(true);
                         }
                     } catch (err) {
-                        setUserProfile({ userId: 'U_TEST_MODE_12345', displayName: '測試遊客' });
+                        setUserProfile({ userId: 'U_TEST_MODE_123456789', displayName: '測試遊客' });
                         setIsLiffInit(true); 
                     }
                 };
@@ -150,24 +148,19 @@
             const [showBindingModal, setShowBindingModal] = useState(false);
             const [applyShopName, setApplyShopName] = useState('');
             const [selectedShop, setSelectedShop] = useState(null);
-            
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0 });
 
-            const [redeemHistory, setRedeemHistory] = useState(() => {
-                const saved = localStorage.getItem('meishan_history');
-                return saved ? JSON.parse(saved) : [];
-            });
-
-            useEffect(() => {
-                localStorage.setItem('meishan_history', JSON.stringify(redeemHistory));
-            }, [redeemHistory]);
+            // 🌟 核心：產生 6 碼短碼 (取 UID 最後 6 碼並轉大寫)
+            const rawUid = userProfile?.userId || 'GUEST_MODE_UID';
+            const shortUid = rawUid.slice(-6).toUpperCase();
+            const nameString = userProfile?.displayName || '遊客';
 
             useEffect(() => {
                 let isMounted = true;
                 const fetchPoints = async () => {
-                    const uid = userProfile?.userId || 'GUEST_MODE_UID';
                     try {
-                        const res = await fetch(`/api/points?uid=${uid}`);
+                        // 使用短碼去查詢資料庫
+                        const res = await fetch(`/api/points?uid=${shortUid}`);
                         if (res.ok && isMounted) {
                             const data = await res.json();
                             if (data.food !== undefined) {
@@ -181,7 +174,7 @@
                 const interval = setInterval(fetchPoints, 15000); 
                 
                 return () => { isMounted = false; clearInterval(interval); };
-            }, [userProfile]);
+            }, [shortUid]);
 
             const totalPoints = customerPoints.food + customerPoints.souvenir + customerPoints.stay;
 
@@ -204,22 +197,19 @@
                 }
                 
                 showToast('⏳ 系統處理中，寫入雲端紀錄...');
-
                 const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
-                const timeStr = new Date().toLocaleString('zh-TW');
 
                 try {
                     const res = await fetch('/api/points', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            uid: userProfile?.userId || 'GUEST_MODE_UID',
-                            userName: userProfile?.displayName || '遊客',
+                            uid: shortUid, // 使用短碼核銷
+                            userName: nameString,
                             action: 'deduct',
                             points: redeemModal.cost,
                             giftName: redeemModal.name,
-                            sn: serialNumber,
-                            time: timeStr
+                            sn: serialNumber
                         })
                     });
 
@@ -229,25 +219,22 @@
                         return;
                     }
 
-                    setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
                     showToast('✅ 核銷成功！');
+                    // 立刻更新畫面點數
+                    let ptsToDeduct = redeemModal.cost;
+                    let newPoints = { ...customerPoints };
+                    for (let cat of ['food', 'souvenir', 'stay']) {
+                        if (ptsToDeduct <= 0) break;
+                        if (newPoints[cat] >= ptsToDeduct) { newPoints[cat] -= ptsToDeduct; ptsToDeduct = 0; }
+                        else { ptsToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
+                    }
+                    setCustomerPoints(newPoints);
 
                     setRedeemModal(null);
                     setStaffPassword('');
                 } catch(e) {
                     showToast('❌ 連線異常，請稍後再試。');
                 }
-            };
-
-            const handleApplyBinding = (e) => {
-                e.preventDefault();
-                if (!applyShopName || applyShopName.trim() === '') {
-                    showToast('❌ 請輸入店名');
-                    return;
-                }
-                const url = `https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的專屬代碼是：${userProfile?.userId}`;
-                window.open(url, '_blank');
-                setShowBindingModal(false);
             };
 
             const renderStickers = () => {
@@ -258,7 +245,6 @@
 
                 const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
                 const slots = [];
-                
                 for(let i=0; i<totalSlots; i++) {
                     if (stickers[i]) {
                         slots.push(
@@ -279,9 +265,8 @@
                 return slots;
             };
 
-            const uidString = userProfile?.userId || 'GUEST_MODE_UID';
-            const nameString = userProfile?.displayName || '遊客';
-            const qrData = encodeURIComponent(`${uidString}|${nameString}`);
+            // QR Code 現在藏的是 6 碼短碼 + 名字
+            const qrData = encodeURIComponent(`${shortUid}|${nameString}`);
 
             return (
                 <div className="min-h-full pb-10">
@@ -306,7 +291,6 @@
                             <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
                                 {renderStickers()}
                             </div>
-                            
                             <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
                                 <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-amber-500 mr-1 border border-white/50"></span>小吃</span>
                                 <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-pink-400 mr-1 border border-white/50"></span>伴手禮</span>
@@ -317,18 +301,25 @@
 
                     <div className="mt-4 mb-2 mx-4 flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-slate-100 p-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-teal-50 rounded-bl-full z-0"></div>
-                        <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬掃描條碼</h3>
-                        <p className="text-sm font-bold text-amber-500 mb-1 relative z-10">(消費滿$200可獲得一點)</p>
-                        <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家</p>
+                        <h3 className="font-extrabold text-slate-700 mb-1 text-lg relative z-10">專屬條碼與代碼</h3>
+                        <p className="text-xs text-slate-400 mb-4 font-medium relative z-10">結帳時請將此畫面交給店家掃描或輸入</p>
                         
-                        <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10">
+                        <div className="bg-white p-2 border-2 border-slate-100 rounded-2xl shadow-inner relative z-10 mb-4">
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
+                        </div>
+
+                        {/* 🌟 新增手動輸入代碼區塊 */}
+                        <div className="text-center relative z-10 w-full px-4">
+                            <div className="text-[10px] text-slate-400 font-bold mb-1">若無法掃描，請提供下方代碼給店家</div>
+                            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl py-3 px-4 font-mono text-3xl font-extrabold text-teal-600 tracking-[0.2em] shadow-inner flex justify-center items-center">
+                                {shortUid}
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
-                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與辦法</button>
+                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>規則說明</button>
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                     </div>
 
@@ -363,31 +354,6 @@
                                 <p>3. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
                                 <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
                                 <p>5. 贈品數量有限，換完為止。</p>
-                                <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 leading-relaxed">
-                                    ※ 主辦單位保有最終修改、變更、活動解釋及終止本活動之權利，若有相關異動將公告於現場，恕不另行通知。
-                                </div>
-                            </div>
-                            
-                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄</h3>
-                                {redeemHistory.length === 0 ? (
-                                    <p className="text-center text-slate-400 text-sm py-4">尚無兌換紀錄</p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {redeemHistory.map((record, idx) => (
-                                            <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
-                                                <div>
-                                                    <div className="font-bold text-slate-700 text-sm">{record.giftName}</div>
-                                                    <div className="text-xs text-slate-400 mt-1">{record.time}</div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-[10px] text-slate-400 mb-1">核銷序號</div>
-                                                    <div className="text-teal-600 font-mono font-bold text-sm bg-teal-50 px-2 py-1 rounded">{record.sn}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -435,7 +401,7 @@
                                     <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕，將這串專屬代碼複製傳送給我們！</p>
+                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕將這串專屬代碼傳送給我們！</p>
                                     <div className="text-left mb-4">
                                         <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
                                         <input 
@@ -443,11 +409,15 @@
                                             className={`w-full bg-slate-50 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-colors ${applyShopName.trim() === '' ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-teal-400'}`}
                                         />
                                     </div>
-                                    <div className="bg-slate-100 p-3 rounded-xl font-mono text-xs text-slate-800 break-all mb-6 font-bold border-2 border-slate-200">
-                                        UID: {userProfile ? userProfile.userId : "無法取得"}
+                                    <div className="bg-slate-100 p-3 rounded-xl font-mono text-[10px] text-slate-500 break-all mb-6 font-bold border-2 border-slate-200 text-left">
+                                        請複製全碼傳給大會：<br/>
+                                        <span className="text-slate-800 text-xs">{userProfile ? userProfile.userId : "無法取得"}</span>
                                     </div>
                                     <div className="flex flex-col space-y-3">
-                                        <button onClick={handleApplyBinding} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
+                                        <button onClick={() => {
+                                            if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
+                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的代碼是：${userProfile?.userId}`, '_blank');
+                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
@@ -458,10 +428,8 @@
                     {selectedShop && (
                         <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-center pt-3 pb-2"><div className="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
                                 <button onClick={() => setSelectedShop(null)} className="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 z-10 transition-colors">X</button>
-                                
-                                <div className="overflow-y-auto px-6 pb-8 pt-2">
+                                <div className="overflow-y-auto px-6 pb-8 pt-8">
                                     {selectedShop.photo && (
                                         <div className="w-full h-48 mt-2 mb-5 rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
                                             <img src={selectedShop.photo} className="w-full h-full object-cover" alt="店家照片" />
@@ -469,20 +437,15 @@
                                     )}
                                     <h2 className="text-2xl font-extrabold text-slate-800 leading-tight mb-2">{selectedShop.name}</h2>
                                     {selectedShop.category && <span className="bg-teal-50 text-teal-700 text-xs px-2.5 py-1 rounded-md font-bold inline-block border border-teal-100 mb-4">{Array.isArray(selectedShop.category) ? selectedShop.category.join(', ') : selectedShop.category}</span>}
-                                    
                                     <div className="space-y-3 mb-6">
                                         {selectedShop.phone && <div className="flex items-center gap-3 text-sm text-slate-600 font-bold">📞 <a href={`tel:${selectedShop.phone}`} className="text-teal-600 hover:underline">{selectedShop.phone}</a></div>}
                                         {selectedShop.address && <div className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-tight">📍 <span>{selectedShop.address}</span></div>}
                                     </div>
-
                                     {selectedShop.description && (
-                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">
-                                            {selectedShop.description}
-                                        </div>
+                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">{selectedShop.description}</div>
                                     )}
-
                                     <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
-                                       className="flex items-center justify-center gap-2 w-full bg-[#0f766e] text-white text-lg font-bold py-4 rounded-2xl shadow-[0_4px_14px_rgba(15,118,110,0.4)] hover:bg-[#115e59] transition-colors active:scale-95">
+                                       className="flex items-center justify-center gap-2 w-full bg-[#0f766e] text-white text-lg font-bold py-4 rounded-2xl shadow-md hover:bg-[#115e59] transition-colors active:scale-95">
                                         🗺️ 開啟 Google 導航
                                     </a>
                                 </div>
@@ -500,103 +463,66 @@
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
                 if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿') || cat.includes('stay')) return '🏠';
-                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳') || cat.includes('麵')) return '🍽️';
+                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳')) return '🍽️';
                 if (cat.includes('attraction') || cat.includes('景點') || cat.includes('步道')) return '🥾';
-                if (cat.includes('experience') || cat.includes('體驗')) return '✨';
-                if (cat.includes('transport') || cat.includes('交通')) return '🚌';
                 if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店') || cat.includes('souvenir')) return '🎁';
                 return '📍';
             };
 
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('小吃') || cat.includes('food') || cat.includes('美食')) return '#f59e0b';
-                if (cat.includes('伴手禮') || cat.includes('gift') || cat.includes('商店') || cat.includes('souvenir')) return '#ec4899';
-                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '#3b82f6';
-                if (cat.includes('景點') || cat.includes('attraction') || cat.includes('步道')) return '#10b981';
+                if (cat.includes('小吃') || cat.includes('food')) return '#f59e0b';
+                if (cat.includes('伴手禮') || cat.includes('gift')) return '#ec4899';
+                if (cat.includes('住宿') || cat.includes('stay')) return '#3b82f6';
+                if (cat.includes('景點') || cat.includes('attraction')) return '#10b981';
                 return '#1f2937'; 
             };
 
             useEffect(() => {
                 let isMounted = true;
-                
                 if (activeTab === 'map' && !mapRef.current) {
                     const container = document.getElementById('map-container');
                     if (container) container.innerHTML = ''; 
-                    
                     const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
-                    
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                        maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
-                    }).addTo(map);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
                     mapRef.current = map;
-
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
                 }
 
                 if (activeTab === 'map' && mapRef.current) {
                     const map = mapRef.current;
-                    
                     const fetchShops = async () => {
                         try {
                             let res = await fetch('/api/shops');
-                            if (res.status === 404) res = await fetch('/api/shop');
-                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                            const data = await res.json();
-                            if (data.error) throw new Error(data.error);
-                            return data;
+                            if (!res.ok) throw new Error();
+                            return await res.json();
                         } catch (err) { throw err; }
                     };
 
                     fetchShops().then(shops => {
                         if (!isMounted) return;
-                        renderShopsToMap(map, shops);
-                    }).catch(err => {
-                        if (!isMounted) return;
-                        const mockShops = [
-                            { id:'1', name: '太平雲梯遊客中心', category: '景點', lat: 23.5593, lng: 120.6015, description: '全台最長景觀吊橋，風景優美。' },
-                            { id:'2', name: '老街特色小吃', category: '小吃', lat: 23.5588, lng: 120.6052, description: '在地熱門特色小吃，香氣四溢。' },
-                        ];
-                        renderShopsToMap(map, mockShops);
-                    });
-
-                    const renderShopsToMap = (mapInstance, shopsData) => {
-                        mapInstance.eachLayer((layer) => {
-                            if (layer instanceof L.Marker) { mapInstance.removeLayer(layer); }
-                        });
-
+                        map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
                         const bounds = [];
-                        shopsData.forEach(shop => {
+                        shops.forEach(shop => {
                             if (shop.lat && shop.lng) {
                                 bounds.push([shop.lat, shop.lng]);
-                                const emoji = getCategoryEmoji(shop.category);
-                                const markerBorder = getCategoryColor(shop.category);
-                                
                                 const customHtml = `
                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
-                                      <div style="background-color: #1f2937; border: 2.5px solid ${markerBorder}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin: 0 auto; transition: transform 0.2s;">
-                                        <span style="font-size: 18px;">${emoji}</span>
+                                      <div style="background-color: #1f2937; border: 2.5px solid ${getCategoryColor(shop.category)}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                                        <span style="font-size: 18px;">${getCategoryEmoji(shop.category)}</span>
                                       </div>
-                                      <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(4px); white-space: nowrap; border: 1px solid rgba(255,255,255,0.1);">
-                                        ${shop.name}
-                                      </div>
+                                      <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">${shop.name}</div>
                                     </div>
                                 `;
-
                                 const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
-                                
-                                const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(mapInstance);
-                                marker.on('click', () => {
-                                    if(onMarkerClick) onMarkerClick(shop);
-                                });
+                                const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map);
+                                marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
                             }
                         });
-
-                        if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-                    };
+                        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+                    }).catch(()=>{});
                 }
-
                 return () => { isMounted = false; };
             }, [activeTab, onMarkerClick]);
 
@@ -605,6 +531,9 @@
 
         function ShopView({ activeShop, showToast }) {
             const [scanStatus, setScanStatus] = useState('idle'); 
+            const [inputMode, setInputMode] = useState('scan'); // 🌟 新增：'scan' 或 'manual'
+            const [manualCode, setManualCode] = useState(''); // 🌟 新增：儲存手動輸入的代碼
+
             const [scannedUid, setScannedUid] = useState('');
             const [scannedName, setScannedName] = useState('');
             const [amount, setAmount] = useState('');
@@ -613,8 +542,13 @@
             const parsedAmount = parseInt(amount, 10) || 0;
             const calculatedPoints = Math.floor(parsedAmount / 200);
 
+            // 當回到首頁時，清空手動輸入框
             useEffect(() => {
-                if (scanStatus === 'scanning') {
+                if (scanStatus === 'idle') setManualCode('');
+            }, [scanStatus]);
+
+            useEffect(() => {
+                if (scanStatus === 'scanning' && inputMode === 'scan') {
                     const scanner = new Html5Qrcode("reader");
                     scannerRef.current = scanner;
                     
@@ -643,7 +577,7 @@
                         scannerRef.current.stop().catch(e => console.log(e));
                     }
                 };
-            }, [scanStatus]);
+            }, [scanStatus, inputMode]);
 
             const handleSubmit = async () => {
                 if (calculatedPoints <= 0) return;
@@ -651,16 +585,22 @@
                 showToast('⏳ 正在傳送點數...');
 
                 try {
+                    const payload = {
+                        uid: scannedUid,
+                        action: 'add',
+                        category: activeShop.category,
+                        points: calculatedPoints
+                    };
+                    
+                    // 如果有名字（代表是掃描的）才上傳名字，手動輸入則不覆蓋舊名字
+                    if (scannedName && scannedName !== '手動輸入遊客') {
+                        payload.userName = scannedName;
+                    }
+
                     const res = await fetch('/api/points', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            uid: scannedUid,
-                            userName: scannedName, 
-                            action: 'add',
-                            category: activeShop.category,
-                            points: calculatedPoints
-                        })
+                        body: JSON.stringify(payload)
                     });
 
                     if (res.ok) {
@@ -687,13 +627,61 @@
                         </div>
                         
                         {scanStatus === 'idle' && (
-                            <button onClick={() => setScanStatus('scanning')} className="w-full bg-teal-500 text-white font-bold py-12 rounded-2xl text-lg flex flex-col items-center shadow-lg active:scale-95 transition-transform hover:bg-teal-600">
-                                <span className="text-5xl mb-3">📷</span>
-                                點此開啟相機<br/>掃描遊客會員條碼
-                            </button>
+                            <div className="animate-fade-in">
+                                {/* 🌟 模式切換按鈕 */}
+                                <div className="flex bg-slate-100 rounded-xl p-1 mb-6 shadow-inner">
+                                    <button 
+                                        onClick={() => setInputMode('scan')} 
+                                        className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all ${inputMode === 'scan' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400'}`}
+                                    >
+                                        📷 掃描條碼
+                                    </button>
+                                    <button 
+                                        onClick={() => setInputMode('manual')} 
+                                        className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all ${inputMode === 'manual' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400'}`}
+                                    >
+                                        ⌨️ 手動輸入
+                                    </button>
+                                </div>
+
+                                {/* 掃描模式介面 */}
+                                {inputMode === 'scan' && (
+                                    <button onClick={() => setScanStatus('scanning')} className="w-full bg-teal-500 text-white font-bold py-10 rounded-2xl text-lg flex flex-col items-center shadow-lg active:scale-95 transition-transform hover:bg-teal-600">
+                                        <span className="text-5xl mb-3">📷</span>
+                                        點此開啟相機掃描
+                                    </button>
+                                )}
+
+                                {/* 🌟 手動輸入模式介面 */}
+                                {inputMode === 'manual' && (
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center shadow-inner">
+                                        <p className="text-sm font-bold text-slate-600 mb-4">請輸入遊客畫面上的 6 碼代碼</p>
+                                        <input 
+                                            type="text" 
+                                            maxLength="6"
+                                            placeholder="例如: A1B2C3"
+                                            value={manualCode}
+                                            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                                            className="w-full bg-white border-2 border-slate-300 rounded-2xl px-4 py-4 text-3xl font-mono text-teal-600 font-bold text-center tracking-[0.3em] outline-none focus:border-teal-400 transition-colors mb-6 shadow-sm uppercase placeholder:tracking-normal placeholder:text-slate-300 placeholder:text-xl"
+                                        />
+                                        <button 
+                                            disabled={manualCode.length < 6}
+                                            onClick={() => {
+                                                setScannedUid(manualCode);
+                                                setScannedName('手動輸入遊客');
+                                                setScanStatus('found');
+                                                showToast('✅ 成功手動鎖定遊客！');
+                                            }}
+                                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-md transition-all ${manualCode.length === 6 ? 'bg-teal-500 hover:bg-teal-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}
+                                        >
+                                            確認查詢
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
-                        {scanStatus === 'scanning' && (
+                        {scanStatus === 'scanning' && inputMode === 'scan' && (
                             <div className="animate-fade-in">
                                 <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-inner mb-4 relative">
                                     <div id="reader" className="w-full min-h-[300px]"></div>
@@ -709,7 +697,7 @@
                             <div className="space-y-6 animate-fade-in">
                                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center text-sm font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
                                     <span className="text-lg">✅ 已鎖定遊客：{scannedName}</span>
-                                    <span className="text-xs font-mono mt-1 opacity-70 bg-white px-2 py-0.5 rounded">UID: {scannedUid.substring(0,10)}...</span>
+                                    <span className="text-sm font-mono mt-1 opacity-80 bg-white px-3 py-1 rounded-full border border-emerald-100">代碼: {scannedUid}</span>
                                 </div>
                                 
                                 <div>
@@ -739,7 +727,7 @@
                             <div className="space-y-6 animate-fade-in text-center p-4">
                                 <div className="text-6xl mb-4 animate-bounce">🎁</div>
                                 <h3 className="font-extrabold text-2xl text-slate-800 mb-2">確認發送點數？</h3>
-                                <p className="text-slate-600 font-medium bg-slate-50 py-3 rounded-xl">即將發送 <strong className="text-teal-600 text-3xl mx-1">{calculatedPoints}</strong> 點給該名遊客</p>
+                                <p className="text-slate-600 font-medium bg-slate-50 py-3 rounded-xl border border-slate-100">即將發送 <strong className="text-teal-600 text-3xl mx-1">{calculatedPoints}</strong> 點給該名遊客</p>
                                 
                                 <div className="flex space-x-3 mt-8">
                                     <button onClick={() => setScanStatus('found')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
