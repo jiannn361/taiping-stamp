@@ -46,7 +46,7 @@
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
+            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S03', name: '測試民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
         const CloudIcon = ({ className }) => (
@@ -671,6 +671,15 @@
                 }
             };
 
+            // 🌟 新增：專屬代碼英數小鍵盤邏輯
+            const handleCodePad = (val) => {
+                if (val === 'delete') {
+                    setManualCode(prev => prev.slice(0, -1));
+                } else {
+                    if (manualCode.length < 6) setManualCode(prev => prev + val);
+                }
+            };
+
             return (
                 <div className="p-5 min-h-full pb-20">
                     <div className="bg-white rounded-3xl p-6 shadow-md relative overflow-hidden border border-slate-100">
@@ -704,20 +713,28 @@
                                 )}
 
                                 {inputMode === 'manual' && (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center shadow-inner">
-                                        <p className="text-sm font-bold text-slate-600 mb-4">請輸入遊客畫面上的 6 碼代碼</p>
-                                        <input 
-                                            type="text" 
-                                            maxLength="6"
-                                            placeholder="如: A1B2C3"
-                                            value={manualCode}
-                                            onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                                            autoCapitalize="characters"
-                                            autoComplete="off"
-                                            autoCorrect="off"
-                                            spellCheck="false"
-                                            className="w-full bg-white border-2 border-slate-300 rounded-2xl px-4 py-4 text-4xl font-mono text-teal-600 font-extrabold text-center tracking-[0.2em] outline-none focus:border-teal-400 transition-colors mb-6 shadow-sm uppercase placeholder:tracking-normal placeholder:text-slate-300 placeholder:text-2xl placeholder:font-sans"
-                                        />
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center shadow-inner">
+                                        <p className="text-sm font-bold text-slate-600 mb-2">請輸入遊客畫面的 6 碼代碼</p>
+                                        
+                                        {/* 顯示框 */}
+                                        <div className="w-full bg-white border-2 border-slate-300 rounded-2xl px-4 py-4 h-16 flex items-center justify-center text-4xl font-mono text-teal-600 font-extrabold tracking-[0.2em] shadow-sm mb-4">
+                                            {manualCode || <span className="text-slate-300 tracking-normal text-lg font-sans">點擊下方鍵盤</span>}
+                                        </div>
+
+                                        {/* 🌟 專屬 16 進位英數鍵盤 (左英右數) */}
+                                        <div className="grid grid-cols-4 gap-2 mb-2">
+                                            {['A','1','2','3', 'B','4','5','6', 'C','7','8','9', 'D','E','F','0'].map(key => (
+                                                <button key={key} onClick={() => handleCodePad(key)} className="bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="mb-4">
+                                            <button onClick={() => handleCodePad('delete')} className="w-full bg-slate-200 py-3 rounded-xl text-lg font-extrabold text-slate-600 shadow-sm border border-slate-300 active:bg-slate-300 active:scale-95 transition-all flex justify-center items-center">
+                                                ⌫ 退格修改
+                                            </button>
+                                        </div>
+
                                         <button 
                                             disabled={manualCode.length < 6 || isQuerying}
                                             onClick={handleManualSearch}
