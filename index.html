@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f766e">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes"> <!-- 🌟 新增這一行標準語法 -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="雲遊太平">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -46,7 +47,7 @@
         const SHOP_ADMINS = {
             'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
+            '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
         };
 
         const CloudIcon = ({ className }) => (
@@ -417,7 +418,7 @@
                                         <button onClick={() => {
                                             if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
                                             window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的代碼是：${userProfile?.userId}`, '_blank');
-                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
+                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給商圈群組</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
@@ -430,11 +431,6 @@
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>
                                 <button onClick={() => setSelectedShop(null)} className="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 z-10 transition-colors">X</button>
                                 <div className="overflow-y-auto px-6 pb-8 pt-8">
-                                    {selectedShop.photo && (
-                                        <div className="w-full h-48 mt-2 mb-5 rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
-                                            <img src={selectedShop.photo} className="w-full h-full object-cover" alt="店家照片" />
-                                        </div>
-                                    )}
                                     <h2 className="text-2xl font-extrabold text-slate-800 leading-tight mb-2">{selectedShop.name}</h2>
                                     {selectedShop.category && <span className="bg-teal-50 text-teal-700 text-xs px-2.5 py-1 rounded-md font-bold inline-block border border-teal-100 mb-4">{Array.isArray(selectedShop.category) ? selectedShop.category.join(', ') : selectedShop.category}</span>}
                                     <div className="space-y-3 mb-6">
@@ -442,7 +438,23 @@
                                         {selectedShop.address && <div className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-tight">📍 <span>{selectedShop.address}</span></div>}
                                     </div>
                                     {selectedShop.description && (
-                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">{selectedShop.description}</div>
+                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">
+                                            {selectedShop.description.split('\n').map((line, idx) => {
+                                                // 使用正規表達式切分出 (括號) 與 （全形括號） 內的文字
+                                                const parts = line.split(/([（(].*?[)）])/g);
+                                                return (
+                                                    <div key={idx} className={idx !== 0 ? 'mt-2' : ''}>
+                                                        {parts.map((part, i) => {
+                                                            // 如果這段文字是被括號包住的，就加上縮小與變淡的樣式
+                                                            if (part.match(/^[（(].*?[)）]$/)) {
+                                                                return <span key={i} className="text-xs text-slate-400 font-normal ml-0.5">{part}</span>;
+                                                            }
+                                                            return part;
+                                                        })}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     )}
                                     <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
                                        className="flex items-center justify-center gap-2 w-full bg-[#0f766e] text-white text-lg font-bold py-4 rounded-2xl shadow-md hover:bg-[#115e59] transition-colors active:scale-95">
