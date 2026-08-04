@@ -148,8 +148,14 @@
             const [staffPassword, setStaffPassword] = useState('');
             const [showBindingModal, setShowBindingModal] = useState(false);
             const [applyShopName, setApplyShopName] = useState('');
+            const [applyShopCategory, setApplyShopCategory] = useState('小吃'); // 🌟 新增：申請時選擇類別
             const [selectedShop, setSelectedShop] = useState(null);
+            
+            const [shopDisplayMode, setShopDisplayMode] = useState('list'); // 🌟 新增：店家顯示模式 (list 或 map)
+            const [shopsData, setShopsData] = useState([]); // 🌟 新增：存放店家資料
+
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0 });
+            const [redeemHistory, setRedeemHistory] = useState([]); 
 
             // 🌟 核心：產生 6 碼短碼 (取 UID 最後 6 碼並轉大寫)
             const rawUid = userProfile?.userId || 'GUEST_MODE_UID';
@@ -172,10 +178,22 @@
                 };
                 
                 fetchPoints(); 
-                const interval = setInterval(fetchPoints, 10000); 
+                const interval = setInterval(fetchPoints, 15000); 
                 
                 return () => { isMounted = false; clearInterval(interval); };
             }, [shortUid]);
+
+            // 🌟 新增：當切換到店家頁籤時，提早去抓取店家名單給列表與地圖共用
+            useEffect(() => {
+                let isMounted = true;
+                if (activeTab === 'map' && shopsData.length === 0) {
+                    fetch('/api/shops')
+                        .then(res => res.json())
+                        .then(data => { if (isMounted) setShopsData(data); })
+                        .catch(e => console.error(e));
+                }
+                return () => { isMounted = false; };
+            }, [activeTab]);
 
             const totalPoints = customerPoints.food + customerPoints.souvenir + customerPoints.stay;
 
@@ -221,6 +239,11 @@
                     }
 
                     showToast('✅ 核銷成功！');
+                    
+                    // 🌟 新增這段：成功後將紀錄存入畫面中
+                    const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
+
                     // 立刻更新畫面點數
                     let ptsToDeduct = redeemModal.cost;
                     let newPoints = { ...customerPoints };
@@ -320,7 +343,7 @@
 
                     <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
-                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>規則說明</button>
+                        <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與規則</button>
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                     </div>
 
@@ -347,7 +370,33 @@
                     )}
 
                     {activeTab === 'rules' && (
-                        <div className="px-5 space-y-6 animate-fade-in">
+                        <div className="px-5 space-y-6 animate-fade-in pb-8">
+                            {/* 🌟 新增：兌換紀錄區塊 */}
+                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄 (本次登入)</h3>
+                                {redeemHistory.length === 0 ? (
+                                    <p className="text-center text-slate-400 text-sm py-4">尚無兌換紀錄</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {redeemHistory.map((record, idx) => (
+                                            <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                                                <div>
+                                                    <div className="font-bold text-slate-700 text-sm">{record.giftName}</div>
+                                                    <div className="text-xs text-slate-400 mt-1">{record.time}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] text-slate-400 mb-1">核銷序號</div>
+                                                    <div className="text-teal-600 font-mono font-bold text-sm bg-teal-50 px-2 py-1 rounded">
+                                                        {record.sn}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 原本的活動辦法區塊 */}
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-sm text-slate-600 space-y-2">
                                 <h3 className="font-bold text-slate-700 mb-3 flex items-center"><span className="text-teal-500 mr-2">✦</span> 活動辦法</h3>
                                 <p className="text-teal-700 font-extrabold bg-teal-50 inline-block px-2 py-1 rounded">1. 活動期間：115/10/09 - 10/11</p>
@@ -361,9 +410,37 @@
 
                     {activeTab === 'map' && (
                         <div className="px-5 space-y-4 animate-fade-in pb-8">
-                           <div className="bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[500px] w-full overflow-hidden relative z-0">
-                               <MapComponent onMarkerClick={setSelectedShop} activeTab={activeTab} />
-                           </div>
+                            {/* 🌟 切換地圖與列表的開關 */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner mb-4">
+                                <button onClick={() => setShopDisplayMode('list')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${shopDisplayMode === 'list' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>📋 列表模式</button>
+                                <button onClick={() => setShopDisplayMode('map')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${shopDisplayMode === 'map' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>🗺️ 地圖模式</button>
+                            </div>
+
+                            {shopDisplayMode === 'map' ? (
+                                <div className="bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[500px] w-full overflow-hidden relative z-0 animate-fade-in">
+                                    {/* 將抓好的資料傳給地圖 */}
+                                    <MapComponent onMarkerClick={setSelectedShop} activeTab={activeTab} shops={shopsData} />
+                                </div>
+                            ) : (
+                                <div className="space-y-3 animate-fade-in pb-10">
+                                    {shopsData.length === 0 ? (
+                                        <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
+                                    ) : (
+                                        shopsData.map(shop => (
+                                            <div key={shop.id} onClick={() => setSelectedShop(shop)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between cursor-pointer hover:border-teal-300 transition-colors active:scale-95">
+                                                <div>
+                                                    <h4 className="font-bold text-slate-800 text-lg mb-1">{shop.name}</h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs bg-teal-50 text-teal-600 font-bold px-2 py-0.5 rounded border border-teal-100">{Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}</span>
+                                                        {shop.phone && <span className="text-xs text-slate-400 font-bold flex items-center">📞 {shop.phone}</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="text-slate-300 font-bold text-xl">❯</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -410,15 +487,33 @@
                                             className={`w-full bg-slate-50 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-colors ${applyShopName.trim() === '' ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-teal-400'}`}
                                         />
                                     </div>
+
+                                    {/* 🌟 新增：強制三選一的類別按鈕 */}
+                                    <div className="text-left mb-5">
+                                        <label className="text-xs font-bold text-slate-500 ml-1 mb-2 block">您的主要發送點數類別 <span className="text-teal-500">*必選</span></label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['小吃', '伴手禮', '住宿'].map(cat => (
+                                                <button 
+                                                    key={cat}
+                                                    onClick={() => setApplyShopCategory(cat)}
+                                                    className={`py-2 rounded-xl text-sm font-bold border-2 transition-all ${applyShopCategory === cat ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                                                >
+                                                    {cat}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div className="bg-slate-100 p-3 rounded-xl font-mono text-[10px] text-slate-500 break-all mb-6 font-bold border-2 border-slate-200 text-left">
                                         請複製全碼傳給大會：<br/>
                                         <span className="text-slate-800 text-xs">{userProfile ? userProfile.userId : "無法取得"}</span>
                                     </div>
                                     <div className="flex flex-col space-y-3">
+                                        {/* 🌟 更新：把選擇的類別一起寫入 LINE 訊息模板 */}
                                         <button onClick={() => {
                                             if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
-                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的代碼是：${userProfile?.userId}`, '_blank');
-                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給商圈群組</button>
+                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A主要類別：${applyShopCategory}%0A我的代碼是：${userProfile?.userId}`, '_blank');
+                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
@@ -468,7 +563,8 @@
             );
         }
 
-        function MapComponent({ onMarkerClick, activeTab }) {
+        // 🌟 更新：MapComponent 現在接收上一層傳進來的 shops 資料，不用自己再去抓一次了
+        function MapComponent({ onMarkerClick, activeTab, shops }) {
             const mapRef = useRef(null);
             
             const getCategoryEmoji = (categories) => {
@@ -502,41 +598,30 @@
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
                 }
 
-                if (activeTab === 'map' && mapRef.current) {
+                if (activeTab === 'map' && mapRef.current && shops && shops.length > 0) {
                     const map = mapRef.current;
-                    const fetchShops = async () => {
-                        try {
-                            let res = await fetch('/api/shops');
-                            if (!res.ok) throw new Error();
-                            return await res.json();
-                        } catch (err) { throw err; }
-                    };
-
-                    fetchShops().then(shops => {
-                        if (!isMounted) return;
-                        map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
-                        const bounds = [];
-                        shops.forEach(shop => {
-                            if (shop.lat && shop.lng) {
-                                bounds.push([shop.lat, shop.lng]);
-                                const customHtml = `
-                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
-                                      <div style="background-color: #1f2937; border: 2.5px solid ${getCategoryColor(shop.category)}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-                                        <span style="font-size: 18px;">${getCategoryEmoji(shop.category)}</span>
-                                      </div>
-                                      <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">${shop.name}</div>
-                                    </div>
-                                `;
-                                const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
-                                const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map);
-                                marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
-                            }
-                        });
-                        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-                    }).catch(()=>{});
+                    map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+                    const bounds = [];
+                    shops.forEach(shop => {
+                        if (shop.lat && shop.lng) {
+                            bounds.push([shop.lat, shop.lng]);
+                            const customHtml = `
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
+                                  <div style="background-color: #1f2937; border: 2.5px solid ${getCategoryColor(shop.category)}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                                    <span style="font-size: 18px;">${getCategoryEmoji(shop.category)}</span>
+                                  </div>
+                                  <div style="background-color: rgba(17, 24, 39, 0.85); color: #f3f4f6; padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">${shop.name}</div>
+                                </div>
+                            `;
+                            const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
+                            const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map);
+                            marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
+                        }
+                    });
+                    if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
                 }
                 return () => { isMounted = false; };
-            }, [activeTab, onMarkerClick]);
+            }, [activeTab, onMarkerClick, shops]);
 
             return <div id="map-container" className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>;
         }
