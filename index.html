@@ -467,7 +467,8 @@
                                                     // 根據分類決定要顯示的 Icon 與顏色
                                                     const getShopStyle = (category) => {
                                                         const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                                                        if (cat.includes('小吃') || cat.includes('food')) return { icon: '🍔', bg: 'bg-[#FAD564]/20', text: 'text-amber-700' };
+                                                        // 🌟 更新：小吃與餐廳統一回傳漢堡 🍔
+                                                        if (cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳')) return { icon: '🍔', bg: 'bg-[#FAD564]/20', text: 'text-amber-700' };
                                                         if (cat.includes('伴手禮') || cat.includes('gift')) return { icon: '🎁', bg: 'bg-[#D3DC7C]/30', text: 'text-lime-800' };
                                                         if (cat.includes('住宿') || cat.includes('stay')) return { icon: '🏨', bg: 'bg-[#8EBD9D]/20', text: 'text-emerald-700' };
                                                         return { icon: '📍', bg: 'bg-slate-100', text: 'text-slate-600' };
@@ -482,11 +483,19 @@
                                                         >
                                                             <div className="flex-1 flex items-center space-x-3">
                                                                 {/* 在列表加上小 Icon */}
-                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${style.bg}`}>
+                                                                <div className={`w-10 h-10 min-w-[40px] rounded-full flex items-center justify-center text-lg ${style.bg}`}>
                                                                     {style.icon}
                                                                 </div>
-                                                                <div>
-                                                                    <h4 className="font-bold text-slate-800 text-[17px] mb-1">{shop.name}</h4>
+                                                                <div className="flex-1 overflow-hidden">
+                                                                    <h4 className="font-bold text-slate-800 text-[17px] mb-1 truncate">{shop.name}</h4>
+                                                                    
+                                                                    {/* 🌟 新增：顯示「提供服務」內容 */}
+                                                                    {shop.services && (
+                                                                        <div className="text-[13px] text-slate-500 mb-1.5 truncate">
+                                                                            {shop.services}
+                                                                        </div>
+                                                                    )}
+
                                                                     <div className="flex flex-wrap gap-2">
                                                                         {shop.category && (
                                                                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
