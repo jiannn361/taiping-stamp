@@ -476,7 +476,7 @@
                                                     const style = getShopStyle(shop.category);
 
                                                     return (
-                                                        <div 
+                                                                                                               <div 
                                                             key={shop.id} 
                                                             onClick={() => setSelectedShop(shop)} 
                                                             className="w-full bg-white border border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-teal-300 transition-all active:scale-95"
@@ -487,21 +487,15 @@
                                                                     {style.icon}
                                                                 </div>
                                                                 <div className="flex-1 overflow-hidden">
-                                                                    <h4 className="font-bold text-slate-800 text-[17px] mb-1 truncate">{shop.name}</h4>
+                                                                    <h4 className="font-bold text-slate-800 text-[17px] mb-1.5 truncate">{shop.name}</h4>
                                                                     
-                                                                    {/* 🌟 新增：顯示「提供服務」內容 */}
-                                                                    {shop.services && (
-                                                                        <div className="text-[13px] text-slate-500 mb-1.5 truncate">
-                                                                            {shop.services}
-                                                                        </div>
-                                                                    )}
-
-                                                                    <div className="flex flex-wrap gap-2">
-                                                                        {shop.category && (
-                                                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
-                                                                                {Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}
+                                                                    {/* 🌟 修改：將原本顯示類別的標籤，改為顯示「提供的服務項目」 */}
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {shop.services && shop.services.split(/[,、，]/).map((srv, idx) => srv.trim() && (
+                                                                            <span key={idx} className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${style.bg} ${style.text} shadow-sm border border-white/50`}>
+                                                                                {srv.trim()}
                                                                             </span>
-                                                                        )}
+                                                                        ))}
                                                                     </div>
                                                                 </div>
                                                             </div>

@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         const data = await response.json();
         
         // 3. 處理資料
-       const formattedShops = data.records.map(record => {
+            const formattedShops = data.records.map(record => {
             let photoUrl = '';
             if (record.fields['照片'] && record.fields['照片'].length > 0) {
                 photoUrl = record.fields['照片'][0].url;
@@ -47,8 +47,7 @@ export default async function handler(req, res) {
                 address: record.fields['地址'] || '',
                 phone: record.fields['電話'] || '',
                 description: record.fields['介紹'] || '',
-                // 🌟 新增：抓取 Airtable 中的「提供服務」欄位
-                services: record.fields['提供服務'] || '',
+                services: record.fields['提供服務'] || record.fields['服務'] || '', // 🌟 新增這一行：抓取服務欄位
                 photo: photoUrl,
                 lat: parseFloat(record.fields['緯度']),
                 lng: parseFloat(record.fields['經度'])
