@@ -261,9 +261,10 @@
 
             const renderStickers = () => {
                 let stickers = [];
-                for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#f4c63d]');
-                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#e6e2c3]');
-                for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#208bba]');
+                // 🌟 更新集點貼紙的顏色，對應新色系
+                for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
+                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#D3DC7C]');
+                for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
 
                 const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
                 const slots = [];
@@ -334,9 +335,10 @@
                                 {renderStickers()}
                             </div>
                             <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full shadow-sm">
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#f4c63d] mr-1 border border-white/50 shadow-sm"></span>小吃</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#e6e2c3] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#208bba] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
+                                {/* 🌟 更新集點卡下方圖例的顏色 */}
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
                             </div>
                         </div>
                     </div>
@@ -437,65 +439,67 @@
                                 </div>
                             ) : (
                                 <div className="animate-fade-in pb-10">
-                                    {/* 🌟 升級版 Bento 堆疊互動卡片設計 */}
-                                    <div className="mt-2 px-1 relative">
+                                    {/* 🌟 恢復原本的橫向排列分類按鈕，並套用新色系與 Icon */}
+                                    <div className="flex space-x-3 mb-6 overflow-x-auto hide-scrollbar pb-2 px-1">
                                         {[
-                                            { id: 'food', name: '小吃餐廳', bg: 'bg-[#f4c63d]', text: 'text-amber-950' }, // Texas Yellow
-                                            { id: 'souvenir', name: '伴 手 禮', bg: 'bg-[#e6e2c3]', text: 'text-slate-800' }, // Wax Yellow
-                                            { id: 'stay', name: '住 宿', bg: 'bg-[#208bba]', text: 'text-white' } // Danish Blue
-                                        ].map((cat, idx) => {
-                                            const isActive = listCategory === cat.id;
-                                            const isAnyActive = listCategory !== null;
-
-                                            // 狀態樣式：沒被選中的變淡縮小；選中的明亮放大
-                                            let stateClasses = "opacity-100 saturate-100 shadow-md";
-                                            if (isAnyActive && !isActive) {
-                                                stateClasses = "opacity-40 saturate-50 scale-[0.98] shadow-sm";
-                                            } else if (isActive) {
-                                                stateClasses = "opacity-100 saturate-100 scale-[1.02] shadow-xl ring-4 ring-teal-500/20";
-                                            }
-
-                                            // 🌟 堆疊邏輯：利用負邊距(-mt-10)與動態 z-index 讓選中的卡片跳到最前面
-                                            const zIndex = isActive ? 'z-30' : (idx === 0 ? 'z-20' : (idx === 1 ? 'z-10' : 'z-0'));
-                                            const overlap = idx !== 0 ? '-mt-10' : '';
-
-                                            return (
-                                                <div
-                                                    key={cat.id}
-                                                    onClick={() => setListCategory(isActive ? null : cat.id)}
-                                                    className={`w-full ${cat.bg} ${cat.text} p-8 rounded-[32px] flex items-center justify-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-2 relative ${zIndex} ${overlap} ${stateClasses}`}
-                                                >
-                                                    <h4 className="font-extrabold text-3xl tracking-widest drop-shadow-sm">{cat.name}</h4>
-                                                </div>
-                                            );
-                                        })}
+                                            { id: 'food', name: '小吃餐廳', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900', border: 'border-[#e5c156]' },
+                                            { id: 'souvenir', name: '伴 手 禮', icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900', border: 'border-[#c1c970]' },
+                                            { id: 'stay', name: '住 宿', icon: '🏨', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900', border: 'border-[#7eab8c]' }
+                                        ].map(cat => (
+                                            <button 
+                                                key={cat.id}
+                                                onClick={() => setListCategory(listCategory === cat.id ? null : cat.id)}
+                                                className={`flex-none flex flex-col items-center justify-center w-[100px] h-[100px] rounded-3xl transition-all duration-300 ${listCategory === cat.id ? `${cat.bg} ${cat.text} shadow-lg scale-105 border border-white/50` : 'bg-white border-2 border-slate-100 text-slate-400 opacity-70 hover:opacity-100 hover:scale-95'}`}
+                                            >
+                                                <span className="text-3xl mb-2 filter drop-shadow-sm">{cat.icon}</span>
+                                                <span className="font-extrabold text-sm tracking-widest">{cat.name}</span>
+                                            </button>
+                                        ))}
                                     </div>
 
-                                    {/* 🌟 點選卡片後，下方滑出隨機洗牌的店家列表 (移除電話保持乾淨) */}
+                                    {/* 🌟 列表區域：加入該分類專屬的 Icon 與顏色標籤 */}
                                     {listCategory && (
-                                        <div className="mt-8 space-y-3 animate-slide-up">
+                                        <div className="space-y-3 animate-slide-up">
                                             {processedShops.length === 0 ? (
                                                 <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
                                             ) : (
-                                                processedShops.map(shop => (
-                                                    <div 
-                                                        key={shop.id} 
-                                                        onClick={() => setSelectedShop(shop)} 
-                                                        className="w-full bg-white border border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-teal-300 transition-all active:scale-95"
-                                                    >
-                                                        <div className="flex-1">
-                                                            <h4 className="font-bold text-slate-800 text-[17px] mb-1">{shop.name}</h4>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {shop.category && (
-                                                                    <span className="text-xs bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded border border-slate-200">
-                                                                        {Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}
-                                                                    </span>
-                                                                )}
+                                                processedShops.map(shop => {
+                                                    // 根據分類決定要顯示的 Icon 與顏色
+                                                    const getShopStyle = (category) => {
+                                                        const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
+                                                        if (cat.includes('小吃') || cat.includes('food')) return { icon: '🍔', bg: 'bg-[#FAD564]/20', text: 'text-amber-700' };
+                                                        if (cat.includes('伴手禮') || cat.includes('gift')) return { icon: '🎁', bg: 'bg-[#D3DC7C]/30', text: 'text-lime-800' };
+                                                        if (cat.includes('住宿') || cat.includes('stay')) return { icon: '🏨', bg: 'bg-[#8EBD9D]/20', text: 'text-emerald-700' };
+                                                        return { icon: '📍', bg: 'bg-slate-100', text: 'text-slate-600' };
+                                                    };
+                                                    const style = getShopStyle(shop.category);
+
+                                                    return (
+                                                        <div 
+                                                            key={shop.id} 
+                                                            onClick={() => setSelectedShop(shop)} 
+                                                            className="w-full bg-white border border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-teal-300 transition-all active:scale-95"
+                                                        >
+                                                            <div className="flex-1 flex items-center space-x-3">
+                                                                {/* 在列表加上小 Icon */}
+                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${style.bg}`}>
+                                                                    {style.icon}
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-bold text-slate-800 text-[17px] mb-1">{shop.name}</h4>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {shop.category && (
+                                                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+                                                                                {Array.isArray(shop.category) ? shop.category.join(', ') : shop.category}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
+                                                            <div className="text-slate-300 font-bold text-xl ml-3">❯</div>
                                                         </div>
-                                                        <div className="text-slate-300 font-bold text-xl ml-3">❯</div>
-                                                    </div>
-                                                ))
+                                                    )
+                                                })
                                             )}
                                         </div>
                                     )}
@@ -588,11 +592,19 @@
                                 <button onClick={() => setSelectedShop(null)} className="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 z-10 transition-colors">X</button>
                                 <div className="overflow-y-auto px-6 pb-8 pt-8">
                                     <h2 className="text-2xl font-extrabold text-slate-800 leading-tight mb-2">{selectedShop.name}</h2>
-                                    {selectedShop.category && <span className="bg-teal-50 text-teal-700 text-xs px-2.5 py-1 rounded-md font-bold inline-block border border-teal-100 mb-4">{Array.isArray(selectedShop.category) ? selectedShop.category.join(', ') : selectedShop.category}</span>}
+                                    {selectedShop.category && (
+                                        <span className="bg-teal-50 text-teal-700 text-xs px-2.5 py-1 rounded-md font-bold inline-block border border-teal-100 mb-4">
+                                            {Array.isArray(selectedShop.category) ? selectedShop.category.join(', ') : selectedShop.category}
+                                        </span>
+                                    )}
+
+                                    {/* 聯絡資訊區塊 */}
                                     <div className="space-y-3 mb-6">
+                                        {selectedShop.phone && <div className="flex items-center gap-3 text-sm text-slate-600 font-bold">📞 <span>{selectedShop.phone}</span></div>}
                                         {selectedShop.address && <div className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-tight">📍 <span>{selectedShop.address}</span></div>}
                                     </div>
-                                    
+
+                                    {/* 介紹文字區塊 (含括號自動變淡縮小) */}
                                     {selectedShop.description && (
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">
                                             {selectedShop.description.split('\n').map((line, idx) => {
@@ -611,17 +623,18 @@
                                         </div>
                                     )}
 
-                                    {/* 🌟 專屬的超大撥打電話按鈕 */}
-                                    {selectedShop.phone && (
-                                        <a href={`tel:${selectedShop.phone}`} className="flex items-center justify-center gap-2 w-full bg-slate-800 text-white text-lg font-bold py-4 rounded-2xl shadow-md hover:bg-slate-700 transition-colors active:scale-95 mb-3">
-                                            📞 撥打電話給店家
+                                    {/* 🌟 導航與電話按鈕並排同行 */}
+                                    <div className="flex gap-3 mt-2">
+                                        <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
+                                           className="flex-1 flex items-center justify-center gap-1.5 bg-[#0f766e] text-white text-[15px] font-bold py-3.5 rounded-xl shadow-sm hover:bg-[#115e59] transition-colors active:scale-95">
+                                            🗺️ 開啟導航
                                         </a>
-                                    )}
-
-                                    <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
-                                       className="flex items-center justify-center gap-2 w-full bg-[#0f766e] text-white text-lg font-bold py-4 rounded-2xl shadow-md hover:bg-[#115e59] transition-colors active:scale-95">
-                                        🗺️ 開啟 Google 導航
-                                    </a>
+                                        {selectedShop.phone && (
+                                            <a href={`tel:${selectedShop.phone}`} className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 text-white text-[15px] font-bold py-3.5 rounded-xl shadow-sm hover:bg-slate-700 transition-colors active:scale-95">
+                                                📞 撥打電話
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -646,9 +659,10 @@
             // 🌟 配合 Bento 卡片新配色修改地圖圖釘顏色
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('小吃') || cat.includes('food')) return '#f4c63d'; // Texas Yellow
-                if (cat.includes('伴手禮') || cat.includes('gift')) return '#e6e2c3'; // Wax Yellow
-                if (cat.includes('住宿') || cat.includes('stay')) return '#208bba'; // Danish Blue
+                // 🌟 更新地圖圖釘顏色，對應新色系
+                if (cat.includes('小吃') || cat.includes('food')) return '#FAD564'; 
+                if (cat.includes('伴手禮') || cat.includes('gift')) return '#D3DC7C'; 
+                if (cat.includes('住宿') || cat.includes('stay')) return '#8EBD9D'; 
                 if (cat.includes('景點') || cat.includes('attraction')) return '#10b981';
                 return '#1f2937'; 
             };
