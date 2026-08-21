@@ -761,14 +761,13 @@
                 showToast('⏳ 正在傳送點數...');
 
                 try {
-                    // 🌟 自動打包 shopName 與 shopUid 傳給 API
                     const payload = {
                         uid: scannedUid,
                         action: 'add',
                         category: activeShop.category,
                         points: calculatedPoints,
-                        shopUid: userProfile?.userId, // 後端認證店家身分用
-                        shopName: activeShop.name     // Google Sheets 紀錄店名用
+                        shopUid: userProfile?.userId,
+                        shopName: activeShop.name
                     };
                     
                     if (scannedName && scannedName !== '手動輸入新遊客' && scannedName !== '無網路(手動鎖定)') {
@@ -783,20 +782,24 @@
 
                     if (res.ok) {
                         showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
-                        
                         const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         setRecentRecords(prev => [{ time: timeStr, uid: scannedUid.slice(-8), name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
                         setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
-
                         setAmount('');
                         setScanStatus('idle');
                     } else {
-                        const errData = await res.json();
-                        showToast(`❌ 發送失敗: ${errData.error || '未知的系統錯誤'}`);
+                        // 🌟 強化錯誤捕捉：準確抓出 Vercel 崩潰原因
+                        const contentType = res.headers.get("content-type");
+                        if (contentType && contentType.includes("application/json")) {
+                            const errData = await res.json();
+                            showToast(`❌ 發送失敗: ${errData.error}`);
+                        } else {
+                            showToast(`❌ 系統錯誤 (狀態碼 ${res.status})，請檢查 Vercel 日誌`);
+                        }
                         setScanStatus('found');
                     }
                 } catch (e) {
-                    showToast(`❌ 連線異常！請檢查網路狀態。`);
+                    showToast(`❌ 網路斷線或異常: ${e.message}`);
                     setScanStatus('found');
                 }
             };
