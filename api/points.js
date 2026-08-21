@@ -1,20 +1,32 @@
 export default async function handler(req, res) {
-    if (req.method !== 'POST' && req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    // 🌟 全局防護罩：攔截所有不可預期的崩潰
+    try {
+        if (req.method !== 'POST' && req.method !== 'GET') {
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
 
-    const Airtable = require('airtable');
-    const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.AIRTABLE_BASE_ID);
-
-    // --- 處理 GET 請求：查詢遊客目前點數 ---
-    if (req.method === 'GET') {
-        const { uid } = req.query;
-        if (!uid) return res.status(400).json({ error: 'Missing UID' });
-
+        // 1. 檢查套件與環境變數 (避免未處理的崩潰)
+        let Airtable;
         try {
-            // 🌟 關鍵修復：將 FIND 改為 SEARCH (不分大小寫)，就能完美比對到你原本的全碼 UID！
+            Airtable = require('airtable');
+        } catch (e) {
+            return res.status(500).json({ error: '系統缺少 airtable 套件' });
+        }
+
+        if (!process.env.AIRTABLE_PAT || !process.env.AIRTABLE_BASE_ID) {
+            return res.status(500).json({ error: 'Vercel 環境變數遺失 (請檢查 PAT 與 BASE_ID)' });
+        }
+
+        const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.AIRTABLE_BASE_ID);
+
+        // 2. 處理 GET 請求
+        if (req.method === 'GET') {
+            const { uid } = req.query;
+            if (!uid) return res.status(400).json({ error: 'Missing UID' });
+
+            // 🌟 修正 Airtable 空白欄位報錯 Bug: 加上 & '' 確保轉為字串
             const records = await base('遊客點數').select({
-                filterByFormula: `SEARCH('${uid}', {UID}) > 0`,
+                filterByFormula: `SEARCH(LOWER('${uid}'), LOWER({UID} & '')) > 0`,
                 maxRecords: 1
             }).firstPage();
 
@@ -30,35 +42,30 @@ export default async function handler(req, res) {
             } else {
                 return res.status(404).json({ error: 'User not found' });
             }
-        } catch (error) {
-            return res.status(500).json({ error: error.message });
         }
-    }
 
-    // --- 處理 POST 請求：加點與扣點 ---
-    const { uid, action, points, giftName, sn, category, userName, shopUid, staffPassword, shopName } = req.body;
-    
-    // 🛡️ 後端驗證 1：防護兌換密碼被繞過
-    if (action === 'deduct') {
-        if (staffPassword !== '8888') {
-            return res.status(401).json({ error: '服務台密碼錯誤，拒絕執行' });
+        // 3. 處理 POST 請求
+        const body = req.body || {};
+        const { uid, action, points, giftName, sn, category, userName, shopUid, staffPassword, shopName } = body;
+
+        if (action === 'deduct') {
+            if (staffPassword !== '8888') {
+                return res.status(401).json({ error: '服務台密碼錯誤，拒絕執行' });
+            }
         }
-    }
 
-    // 🛡️ 後端驗證 2：店家發點身分驗證 
-    // 👉 記得將這裡替換成您真實店家的 LINE UID 陣列
-    const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24a', '請貼上店家的真實UID_1'];
-    const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24b', '請貼上店家的真實UID_2'];
-    if (action === 'add') {
-        if (!VALID_SHOPS.includes(shopUid)) {
-            // return res.status(403).json({ error: '非授權店家，拒絕發送點數' }); // 測試期間可先註解此行
+        // 這裡記得填入真實的店家 UID
+        const VALID_SHOPS = ['U1234567890abcdef1234567890abcdef', '請貼上店家的真實UID_1'];
+        if (action === 'add') {
+            if (!VALID_SHOPS.includes(shopUid)) {
+                // 測試期間可以先把這行註解掉，等確定名單後再開啟
+                // return res.status(403).json({ error: '非授權店家，拒絕發送點數' });
+            }
         }
-    }
 
-    try {
-        // 🌟 關鍵修復：將 FIND 改為 SEARCH (不分大小寫)
+        // 🌟 同步修正 POST 寫入時的比對公式
         const records = await base('遊客點數').select({
-            filterByFormula: `SEARCH('${uid}', {UID}) > 0`,
+            filterByFormula: `SEARCH(LOWER('${uid}'), LOWER({UID} & '')) > 0`,
             maxRecords: 1
         }).firstPage();
 
@@ -100,7 +107,6 @@ export default async function handler(req, res) {
                 }]);
             }
         } else {
-            // 新使用者第一次拿到點數
             if (action === 'add') {
                 await base('遊客點數').create([{
                     fields: {
@@ -112,7 +118,6 @@ export default async function handler(req, res) {
             }
         }
 
-        // 🚀 推播到 Google Sheets
         if (action === 'add' && process.env.GOOGLE_SHEET_URL) {
             try {
                 fetch(process.env.GOOGLE_SHEET_URL, {
@@ -133,7 +138,9 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({ success: true });
+
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        // 🚀 捕捉最外層所有未知錯誤，並回傳真正的錯誤原因！
+        return res.status(500).json({ error: error.message || '發生未知的嚴重錯誤' });
     }
 }
