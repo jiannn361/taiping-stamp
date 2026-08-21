@@ -44,6 +44,13 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // 🌟 恢復可愛的雲朵組件
+        const CloudIcon = ({ className }) => (
+            <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+                <path d="M17.5 19c2.76 0 5-2.24 5-5s-2.24-5-5-5c-.17 0-.34.02-.51.05C16.43 6.13 13.93 4 11 4c-3.87 0-7 3.13-7 7 0 .17 0 .34.02.51C1.75 11.96 0 13.71 0 16c0 2.76 2.24 5 5 5h12.5z"/>
+            </svg>
+        );
+
         const SHOP_ADMINS = {
             'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '測試店家', category: 'food' },
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir' },
@@ -160,7 +167,6 @@
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
-            // 🌟 升級為 8 碼短碼，防撞號
             const rawUid = userProfile?.userId || 'GUEST_MODE_UID';
             const shortUid = rawUid.slice(-8).toUpperCase();
             const nameString = userProfile?.displayName || '遊客';
@@ -195,7 +201,6 @@
                 return () => { isMounted = false; };
             }, [activeTab]);
 
-            // 取後台算好的總點數，若無則自行相加
             const totalPoints = customerPoints.total || (customerPoints.food + customerPoints.souvenir + customerPoints.stay);
 
             const redeemGifts = [
@@ -230,7 +235,7 @@
                             points: redeemModal.cost,
                             giftName: redeemModal.name,
                             sn: serialNumber,
-                            staffPassword: staffPassword // 傳送密碼給後端驗證
+                            staffPassword: staffPassword 
                         })
                     });
 
@@ -261,7 +266,6 @@
                 }
             };
 
-            // 洗牌演算法
             const processedShops = React.useMemo(() => {
                 let filtered = shopsData;
                 if (listCategory && listCategory !== 'all') {
@@ -281,7 +285,35 @@
                 return shuffled;
             }, [shopsData, listCategory]);
 
-            // 完整 UID 藏在 QR Code 中
+            // 🌟 恢復產生雲朵貼紙陣列的方法
+            const renderStickers = () => {
+                let stickers = [];
+                for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
+                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#D3DC7C]');
+                for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
+
+                const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
+                const slots = [];
+                for(let i=0; i<totalSlots; i++) {
+                    if (stickers[i]) {
+                        slots.push(
+                            <div key={i} className="relative flex items-center justify-center w-12 h-12 transform hover:scale-110 transition-transform">
+                                <CloudIcon className={`w-14 h-14 ${stickers[i]} absolute z-10 drop-shadow-sm`} />
+                                <span className="z-20 text-white text-xs font-bold pt-1">{i + 1}</span>
+                            </div>
+                        );
+                    } else {
+                        slots.push(
+                            <div key={i} className="relative flex items-center justify-center w-12 h-12 opacity-50">
+                                <CloudIcon className="w-14 h-14 text-white absolute z-10" />
+                                <span className="z-20 text-teal-200 text-xs font-bold pt-1">{i + 1}</span>
+                            </div>
+                        );
+                    }
+                }
+                return slots;
+            };
+
             const qrData = encodeURIComponent(`${rawUid}|${nameString}`);
 
             return (
@@ -296,36 +328,22 @@
                             </h1>
                         </div>
                         
-                        <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4 mx-2 relative overflow-hidden">
-    {/* 裝飾性背景光暈 */}
-    <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-teal-100 rounded-full blur-2xl opacity-60"></div>
-    
-    <div className="flex justify-between items-end mb-4 relative z-10">
-        <div className="font-bold text-teal-900 tracking-wide text-sm">我的雲朵集點卡</div>
-        <div className="text-teal-700 font-extrabold">共 <span className="text-2xl mx-0.5">{totalPoints}</span> 點</div>
-    </div>
+                        <div className="text-center text-teal-900 mb-4">
+                            <div className="text-sm opacity-80 mb-1 font-bold tracking-wide">目前總點數</div>
+                            <div className="text-6xl font-extrabold drop-shadow-sm flex justify-center items-baseline space-x-2">
+                                <span>{totalPoints}</span> <span className="text-2xl font-bold">點</span>
+                            </div>
+                        </div>
 
-    {/* 雲朵印章網格 (預設顯示 10 格，可依需求調整) */}
-    <div className="grid grid-cols-5 gap-3 justify-items-center relative z-10">
-        {Array.from({ length: 10 }).map((_, i) => {
-            const isStamped = i < totalPoints;
-            return (
-                <div key={i} className={`w-[3.2rem] h-[3.2rem] rounded-2xl flex items-center justify-center text-2xl transition-all duration-500 ${isStamped ? 'bg-white shadow-md scale-105 border-2 border-teal-100' : 'bg-white/30 border border-white/50'}`}>
-                    {/* 如果你有自己設計的雲朵圖片，可以把 ☁️ 換成 <img src="你的圖片網址" /> */}
-                    <span className={`transform transition-transform duration-500 ${isStamped ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}>
-                        ☁️
-                    </span>
-                </div>
-            );
-        })}
-    </div>
-</div>
-
+                        {/* 🌟 恢復原汁原味的雲朵網格與標籤 */}
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4 mx-2">
-                            <div className="flex justify-center space-x-4 text-sm text-teal-900 font-bold py-2">
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50"></span>小吃: {customerPoints.food}</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50"></span>伴手禮: {customerPoints.souvenir}</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50"></span>住宿: {customerPoints.stay}</span>
+                            <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
+                                {renderStickers()}
+                            </div>
+                            <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
                             </div>
                         </div>
                     </div>
@@ -425,7 +443,6 @@
                                 </div>
                             ) : (
                                 <div className="space-y-4 animate-fade-in pb-10">
-                                    {/* 🌟 恢復橫向三個按鈕，並套用春日新色 */}
                                     <div className="grid grid-cols-3 gap-3">
                                         {[
                                             { id: 'food', name: '小吃', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
@@ -467,7 +484,6 @@
                                                                 <h4 className="font-bold text-slate-800 text-lg">{shop.name}</h4>
                                                             </div>
                                                             
-                                                            {/* 🌟 替換為空心邊框的服務項目標籤 */}
                                                             {shop.services && (
                                                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                                                     {shop.services.split(/[,、]/).map((service, i) => service.trim() && (
@@ -604,7 +620,6 @@
                                         </div>
                                     )}
                                     
-                                    {/* 🌟 導航與電話並排設計 */}
                                     <div className="flex gap-3">
                                         <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
                                            className="flex-1 flex items-center justify-center gap-2 bg-[#0f766e] text-white text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-[#115e59] transition-colors active:scale-95">
@@ -716,7 +731,6 @@
                         { fps: 10, qrbox: { width: 250, height: 250 } },
                         (decodedText) => {
                             scanner.stop().then(() => {
-                                // 支援新版完整 UID 格式 (uid|name)
                                 const parts = decodedText.split('|');
                                 setScannedUid(parts[0]);
                                 setScannedName(parts[1] || '未知遊客');
@@ -740,7 +754,7 @@
             }, [scanStatus, inputMode]);
 
             const handleManualSearch = async () => {
-                if (manualCode.length < 8) return; // 短碼改為 8 碼
+                if (manualCode.length < 8) return;
                 setIsQuerying(true);
                 showToast('⏳ 查詢遊客資料中...');
                 try {
@@ -806,7 +820,6 @@
                         setAmount('');
                         setScanStatus('idle');
                     } else {
-                        // 🌟 強化錯誤捕捉：準確抓出 Vercel 崩潰原因
                         const contentType = res.headers.get("content-type");
                         if (contentType && contentType.includes("application/json")) {
                             const errData = await res.json();
@@ -836,7 +849,7 @@
                 if (val === 'delete') {
                     setManualCode(prev => prev.slice(0, -1));
                 } else {
-                    if (manualCode.length < 8) setManualCode(prev => prev + val); // 短碼 8 碼上限
+                    if (manualCode.length < 8) setManualCode(prev => prev + val); 
                 }
             };
 
