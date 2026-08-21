@@ -13,12 +13,16 @@
     <meta name="apple-mobile-web-app-title" content="雲遊太平">
     <link rel="apple-touch-icon" href="icon-192.png">
     
+    <!-- 引入 Tailwind, React, Babel -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 引入 LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     
+    <!-- 引入 Leaflet (地圖) 與 QR Code 掃描器 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -44,7 +48,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🌟 恢復可愛的雲朵組件
         const CloudIcon = ({ className }) => (
             <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
                 <path d="M17.5 19c2.76 0 5-2.24 5-5s-2.24-5-5-5c-.17 0-.34.02-.51.05C16.43 6.13 13.93 4 11 4c-3.87 0-7 3.13-7 7 0 .17 0 .34.02.51C1.75 11.96 0 13.71 0 16c0 2.76 2.24 5 5 5h12.5z"/>
@@ -56,6 +59,14 @@
             '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir' },
             '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay' }
         };
+
+        // 模擬店家資料 (取代原本的 /api/shops)
+        const MOCK_SHOPS_DATA = [
+            { id: 'S01', name: '太平老街冬瓜茶', category: 'food', lat: 23.5592, lng: 120.6051, address: '嘉義縣梅山鄉太平村', services: '行動支付,冷飲', description: '傳承三代的古早味冬瓜茶，清涼解渴。' },
+            { id: 'S02', name: '阿里山高山茶葉行', category: 'souvenir', lat: 23.5588, lng: 120.6048, address: '嘉義縣梅山鄉太平村老街', services: '提供試飲,宅配', description: '嚴選阿里山高山烏龍茶，自用送禮兩相宜。' },
+            { id: 'S03', name: '雲海景觀民宿', category: 'stay', lat: 23.5598, lng: 120.6060, address: '嘉義縣梅山鄉太平村', services: '附早餐,觀景露台', description: '早晨推開窗就能看見美麗的太平雲海，享受芬多精。' },
+            { id: 'S04', name: '老街古早味小吃', category: 'food', lat: 23.5585, lng: 120.6055, address: '嘉義縣梅山鄉', services: '內用,外帶', description: '招牌滷肉飯與在地筍乾，必吃美食。' }
+        ];
 
         const Toast = ({ message }) => {
             if (!message) return null;
@@ -98,7 +109,8 @@
                             setIsLiffInit(true);
                         }
                     } catch (err) {
-                        setLiffError("系統初始化失敗，請確認網路狀態後重新整理網頁！");
+                        console.error("LIFF 初始化失敗", err);
+                        setLiffError("請在 LINE 應用程式中開啟此連結以使用完整功能。");
                     }
                 };
                 initLiff();
@@ -131,7 +143,7 @@
                         <div className="flex items-center space-x-2 font-bold tracking-wide">
                             {userProfile && (
                                 <>
-                                    <img src={userProfile.pictureUrl || 'https://placehold.co/100'} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-teal-400 shadow-sm" />
+                                    <img src={userProfile.pictureUrl} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-teal-400 shadow-sm" />
                                     <span>{userProfile.displayName}</span>
                                 </>
                             )}
@@ -164,44 +176,22 @@
             const [shopsData, setShopsData] = useState([]); 
             const [listCategory, setListCategory] = useState('all');
 
-            const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0, total: 0 });
+            // 初始給予一些測試點數
+            const [customerPoints, setCustomerPoints] = useState({ food: 3, souvenir: 2, stay: 1, total: 6 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
             const rawUid = userProfile?.userId || 'GUEST_MODE_UID';
             const shortUid = rawUid.slice(-8).toUpperCase();
             const nameString = userProfile?.displayName || '遊客';
 
+            // 模擬載入店家資料
             useEffect(() => {
-                let isMounted = true;
-                const fetchPoints = async () => {
-                    try {
-                        const res = await fetch(`/api/points?uid=${shortUid}`);
-                        if (res.ok && isMounted) {
-                            const data = await res.json();
-                            if (data.food !== undefined) {
-                                setCustomerPoints(data);
-                            }
-                        }
-                    } catch(e) {}
-                };
-                
-                fetchPoints(); 
-                const interval = setInterval(fetchPoints, 15000); 
-                return () => { isMounted = false; clearInterval(interval); };
-            }, [shortUid]);
-
-            useEffect(() => {
-                let isMounted = true;
                 if (activeTab === 'map' && shopsData.length === 0) {
-                    fetch('/api/shops')
-                        .then(res => res.json())
-                        .then(data => { if (isMounted) setShopsData(data); })
-                        .catch(e => console.error(e));
+                    setShopsData(MOCK_SHOPS_DATA);
                 }
-                return () => { isMounted = false; };
             }, [activeTab]);
 
-            const totalPoints = customerPoints.total || (customerPoints.food + customerPoints.souvenir + customerPoints.stay);
+            const totalPoints = customerPoints.total;
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -217,34 +207,15 @@
 
             const confirmStaffRedeem = async () => {
                 if (staffPassword !== '8888') {
-                    showToast('❌ 工作人員密碼錯誤！');
+                    showToast('❌ 工作人員密碼錯誤！(測試密碼為8888)');
                     return;
                 }
                 
                 showToast('⏳ 系統處理中...');
                 const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
 
-                try {
-                    const res = await fetch('/api/points', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            uid: shortUid,
-                            userName: nameString,
-                            action: 'deduct',
-                            points: redeemModal.cost,
-                            giftName: redeemModal.name,
-                            sn: serialNumber,
-                            staffPassword: staffPassword 
-                        })
-                    });
-
-                    if (!res.ok) {
-                        const err = await res.json();
-                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
-                        return;
-                    }
-
+                // 模擬 API 延遲與狀態更新
+                setTimeout(() => {
                     showToast('✅ 核銷成功！');
                     const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
@@ -258,12 +229,9 @@
                     }
                     newPoints.total -= redeemModal.cost;
                     setCustomerPoints(newPoints);
-
                     setRedeemModal(null);
                     setStaffPassword('');
-                } catch(e) {
-                    showToast('❌ 連線異常，請稍後再試。');
-                }
+                }, 800);
             };
 
             const processedShops = React.useMemo(() => {
@@ -277,15 +245,9 @@
                         return false;
                     });
                 }
-                const shuffled = [...filtered];
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                }
-                return shuffled;
+                return filtered;
             }, [shopsData, listCategory]);
 
-            // 🌟 恢復產生雲朵貼紙陣列的方法
             const renderStickers = () => {
                 let stickers = [];
                 for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
@@ -335,7 +297,6 @@
                             </div>
                         </div>
 
-                        {/* 🌟 恢復原汁原味的雲朵網格與標籤 */}
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4 mx-2">
                             <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
                                 {renderStickers()}
@@ -366,9 +327,9 @@
                     </div>
 
                     <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
+                        <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                         <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
                         <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與規則</button>
-                        <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                     </div>
 
                     {activeTab === 'card' && (
@@ -400,12 +361,12 @@
                                 <p className="text-teal-700 font-extrabold bg-teal-50 inline-block px-2 py-1 rounded">1. 活動期間：115/10/09 - 10/11</p>
                                 <p>2. 於合作店家消費滿$200元即可獲得一點。</p>
                                 <p>3. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
-                                <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
+                                <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作。</p>
                                 <p>5. 贈品數量有限，換完為止。</p>
                             </div>
 
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄 (本次登入)</h3>
+                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄</h3>
                                 {redeemHistory.length === 0 ? (
                                     <p className="text-center text-slate-400 text-sm py-4">尚無兌換紀錄</p>
                                 ) : (
@@ -418,9 +379,7 @@
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-[10px] text-slate-400 mb-1">核銷序號</div>
-                                                    <div className="text-teal-600 font-mono font-bold text-sm bg-teal-50 px-2 py-1 rounded">
-                                                        {record.sn}
-                                                    </div>
+                                                    <div className="text-teal-600 font-mono font-bold text-sm bg-teal-50 px-2 py-1 rounded">{record.sn}</div>
                                                 </div>
                                             </div>
                                         ))}
@@ -438,7 +397,7 @@
                             </div>
 
                             {shopDisplayMode === 'map' ? (
-                                <div className="bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[500px] w-full overflow-hidden relative z-0 animate-fade-in">
+                                <div className="bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[400px] w-full overflow-hidden relative z-0 animate-fade-in">
                                     <MapComponent onMarkerClick={setSelectedShop} activeTab={activeTab} shops={shopsData} />
                                 </div>
                             ) : (
@@ -464,9 +423,7 @@
                                     </div>
 
                                     <div className="mt-6 space-y-3">
-                                        {shopsData.length === 0 ? (
-                                            <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
-                                        ) : processedShops.length === 0 ? (
+                                        {processedShops.length === 0 ? (
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
                                         ) : (
                                             processedShops.map(shop => {
@@ -483,7 +440,6 @@
                                                                 <span className="text-xl">{icon}</span>
                                                                 <h4 className="font-bold text-slate-800 text-lg">{shop.name}</h4>
                                                             </div>
-                                                            
                                                             {shop.services && (
                                                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                                                     {shop.services.split(/[,、]/).map((service, i) => service.trim() && (
@@ -505,12 +461,7 @@
                         </div>
                     )}
 
-                    <div className="px-5 mt-12 mb-8 text-center">
-                        <button onClick={() => setShowBindingModal(true)} className="text-xs text-slate-400 underline decoration-slate-300 hover:text-slate-600 font-bold">
-                            我是合作店家，需要開通發點權限
-                        </button>
-                    </div>
-
+                    {}
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
@@ -521,60 +472,12 @@
                                     <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
                                     <p className="text-rose-500 font-bold mb-6 bg-rose-50 inline-block px-3 py-1 rounded-full text-sm">將扣除 {redeemModal.cost} 點</p>
                                     <input 
-                                        type="password" placeholder="輸入密碼" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)}
+                                        type="password" placeholder="輸入密碼 (預覽測試請輸入8888)" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)}
                                         className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none focus:border-rose-400 transition-colors"
                                     />
                                     <div className="flex space-x-3">
                                         <button onClick={() => {setRedeemModal(null); setStaffPassword('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">取消</button>
                                         <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600">確認扣點</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {showBindingModal && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
-                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
-                                <div className="bg-slate-800 p-4 text-center text-white">
-                                    <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
-                                </div>
-                                <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕將這串專屬代碼傳送給我們！</p>
-                                    <div className="text-left mb-4">
-                                        <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
-                                        <input 
-                                            type="text" placeholder="例如：太平雲梯服務中心" value={applyShopName} onChange={(e) => setApplyShopName(e.target.value)}
-                                            className={`w-full bg-slate-50 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-colors ${applyShopName.trim() === '' ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-teal-400'}`}
-                                        />
-                                    </div>
-
-                                    <div className="text-left mb-5">
-                                        <label className="text-xs font-bold text-slate-500 ml-1 mb-2 block">您的主要發送點數類別 <span className="text-teal-500">*必選</span></label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {['小吃/餐廳', '伴手禮', '住宿'].map(cat => (
-                                                <button 
-                                                    key={cat}
-                                                    onClick={() => setApplyShopCategory(cat)}
-                                                    className={`py-2 rounded-xl text-sm font-bold border-2 transition-all ${applyShopCategory === cat ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                                                >
-                                                    {cat}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-slate-100 p-3 rounded-xl font-mono text-[10px] text-slate-500 break-all mb-6 font-bold border-2 border-slate-200 text-left">
-                                        請複製全碼傳給大會：<br/>
-                                        <span className="text-slate-800 text-xs">{userProfile ? userProfile.userId : "無法取得"}</span>
-                                    </div>
-                                    <div className="flex flex-col space-y-3">
-                                        <button onClick={() => {
-                                            if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
-                                            if(!applyShopCategory) { showToast('❌ 請選擇您的主要發送點數類別'); return;}
-                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A主要類別：${applyShopCategory}%0A我的代碼是：${userProfile?.userId}`, '_blank');
-                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
-                                        <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
                             </div>
@@ -604,33 +507,15 @@
 
                                     {selectedShop.description && (
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">
-                                            {selectedShop.description.split('\n').map((line, idx) => {
-                                                const parts = line.split(/([（(].*?[)）])/g);
-                                                return (
-                                                    <div key={idx} className={idx !== 0 ? 'mt-2' : ''}>
-                                                        {parts.map((part, i) => {
-                                                            if (part.match(/^[（(].*?[)）]$/)) {
-                                                                return <span key={i} className="text-xs text-slate-400 font-normal ml-0.5">{part}</span>;
-                                                            }
-                                                            return part;
-                                                        })}
-                                                    </div>
-                                                );
-                                            })}
+                                            {selectedShop.description}
                                         </div>
                                     )}
                                     
                                     <div className="flex gap-3">
-                                        <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
+                                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
                                            className="flex-1 flex items-center justify-center gap-2 bg-[#0f766e] text-white text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-[#115e59] transition-colors active:scale-95">
                                             🗺️ 導航
                                         </a>
-                                        {selectedShop.phone && (
-                                            <a href={`tel:${selectedShop.phone}`} 
-                                               className="flex-1 flex items-center justify-center gap-2 bg-slate-100 text-slate-700 text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-slate-200 border border-slate-200 transition-colors active:scale-95">
-                                                📞 撥號
-                                            </a>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -646,15 +531,15 @@
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
-                if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿') || cat.includes('stay')) return '🏠';
-                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳')) return '🍔';
-                if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店') || cat.includes('souvenir')) return '🎁';
+                if (cat.includes('住宿') || cat.includes('stay')) return '🏠';
+                if (cat.includes('美食') || cat.includes('小吃') || cat.includes('food')) return '🍔';
+                if (cat.includes('伴手禮') || cat.includes('souvenir')) return '🎁';
                 return '📍';
             };
 
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳')) return '#FAD564';
+                if (cat.includes('小吃') || cat.includes('food')) return '#FAD564';
                 if (cat.includes('伴手禮') || cat.includes('gift')) return '#D3DC7C';
                 if (cat.includes('住宿') || cat.includes('stay')) return '#8EBD9D';
                 return '#1f2937'; 
@@ -692,7 +577,7 @@
                             marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
                         }
                     });
-                    if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+                    if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
                 }
                 return () => { isMounted = false; };
             }, [activeTab, onMarkerClick, shops]);
@@ -710,9 +595,7 @@
             const [amount, setAmount] = useState('');
             const scannerRef = useRef(null);
 
-            const [isQuerying, setIsQuerying] = useState(false);
             const [recentRecords, setRecentRecords] = useState([]);
-            const [cooldowns, setCooldowns] = useState({});
 
             const parsedAmount = parseInt(amount, 10) || 0;
             const calculatedPoints = Math.floor(parsedAmount / 200);
@@ -753,86 +636,35 @@
                 };
             }, [scanStatus, inputMode]);
 
-            const handleManualSearch = async () => {
+            const handleManualSearch = () => {
                 if (manualCode.length < 8) return;
-                setIsQuerying(true);
                 showToast('⏳ 查詢遊客資料中...');
-                try {
-                    const res = await fetch(`/api/points?uid=${manualCode}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setScannedUid(manualCode);
-                        setScannedName(data.name && data.name !== '新遊客' ? data.name : '手動輸入新遊客');
-                        setScanStatus('found');
-                        showToast('✅ 成功鎖定遊客！');
-                    } else {
-                        setScannedUid(manualCode);
-                        setScannedName('手動輸入新遊客');
-                        setScanStatus('found');
-                    }
-                } catch(e) {
+                
+                // 模擬 API 查詢成功
+                setTimeout(() => {
                     setScannedUid(manualCode);
-                    setScannedName('無網路(手動鎖定)');
+                    setScannedName('測試遊客 (模擬查詢)');
                     setScanStatus('found');
-                } finally {
-                    setIsQuerying(false);
-                }
+                    showToast('✅ 成功鎖定遊客！');
+                }, 600);
             };
 
             const proceedToConfirm = () => {
-                const lastTime = cooldowns[scannedUid];
-                if (lastTime && (Date.now() - lastTime) < 1 * 60 * 1000) {
-                    showToast('❌ 錯誤：1 分鐘內已發送過點數，系統啟動防重複保護！');
-                    return;
-                }
                 setScanStatus('confirm');
             };
 
-            const handleSubmit = async () => {
+            const handleSubmit = () => {
                 if (calculatedPoints <= 0) return;
                 showToast('⏳ 正在傳送點數...');
 
-                try {
-                    const payload = {
-                        uid: scannedUid,
-                        action: 'add',
-                        category: activeShop.category,
-                        points: calculatedPoints,
-                        shopUid: userProfile?.userId,
-                        shopName: activeShop.name
-                    };
-                    
-                    if (scannedName && scannedName !== '手動輸入新遊客' && scannedName !== '無網路(手動鎖定)') {
-                        payload.userName = scannedName;
-                    }
-
-                    const res = await fetch('/api/points', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (res.ok) {
-                        showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
-                        const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        setRecentRecords(prev => [{ time: timeStr, uid: scannedUid.slice(-8), name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
-                        setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
-                        setAmount('');
-                        setScanStatus('idle');
-                    } else {
-                        const contentType = res.headers.get("content-type");
-                        if (contentType && contentType.includes("application/json")) {
-                            const errData = await res.json();
-                            showToast(`❌ 發送失敗: ${errData.error}`);
-                        } else {
-                            showToast(`❌ 系統錯誤 (狀態碼 ${res.status})，請檢查 Vercel 日誌`);
-                        }
-                        setScanStatus('found');
-                    }
-                } catch (e) {
-                    showToast(`❌ 網路斷線或異常: ${e.message}`);
-                    setScanStatus('found');
-                }
+                // 模擬傳送成功
+                setTimeout(() => {
+                    showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
+                    const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    setRecentRecords(prev => [{ time: timeStr, uid: scannedUid.slice(-8), name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
+                    setAmount('');
+                    setScanStatus('idle');
+                }, 800);
             };
 
             const handleNumpad = (val) => {
@@ -887,39 +719,28 @@
 
                                 {inputMode === 'manual' && (
                                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center shadow-inner">
-                                        <p className="text-sm font-bold text-slate-600 mb-2">請輸入遊客畫面的 8 碼代碼</p>
+                                        <p className="text-sm font-bold text-slate-600 mb-2">請隨意輸入 8 碼代碼進行測試</p>
                                         
                                         <div className="relative w-full mb-4">
                                             <div className="w-full bg-white border-2 border-slate-300 rounded-2xl pr-12 pl-4 py-4 h-16 flex items-center justify-center text-4xl font-mono text-teal-600 font-extrabold tracking-widest shadow-sm">
                                                 {manualCode || <span className="text-slate-300 tracking-normal text-lg font-sans">點擊下方鍵盤</span>}
                                             </div>
-                                            
-                                            <button 
-                                                onClick={() => handleCodePad('delete')} 
-                                                disabled={manualCode.length === 0}
-                                                className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl text-xl font-bold transition-all ${manualCode.length > 0 ? 'text-slate-500 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 shadow-sm' : 'text-slate-200 bg-transparent'}`}
-                                            >
-                                                ⌫
-                                            </button>
+                                            <button onClick={() => handleCodePad('delete')} disabled={manualCode.length === 0} className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl text-xl font-bold transition-all ${manualCode.length > 0 ? 'text-slate-500 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 shadow-sm' : 'text-slate-200 bg-transparent'}`}>⌫</button>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2 mb-5">
                                             {['A','B','C', 'D','E','F', '1','2','3', '4','5','6', '7','8','9'].map(key => (
-                                                <button key={key} onClick={() => handleCodePad(key)} className="bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">
-                                                    {key}
-                                                </button>
+                                                <button key={key} onClick={() => handleCodePad(key)} className="bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">{key}</button>
                                             ))}
-                                            <button onClick={() => handleCodePad('0')} className="col-start-2 bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">
-                                                0
-                                            </button>
+                                            <button onClick={() => handleCodePad('0')} className="col-start-2 bg-white py-3 rounded-xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-200 active:bg-teal-50 active:scale-95 transition-all">0</button>
                                         </div>
 
                                         <button 
-                                            disabled={manualCode.length < 8 || isQuerying}
+                                            disabled={manualCode.length < 8}
                                             onClick={handleManualSearch}
-                                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-md transition-all flex justify-center items-center ${manualCode.length === 8 && !isQuerying ? 'bg-teal-500 hover:bg-teal-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}
+                                            className={`w-full py-4 rounded-xl font-bold text-lg shadow-md transition-all flex justify-center items-center ${manualCode.length === 8 ? 'bg-teal-500 hover:bg-teal-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}
                                         >
-                                            {isQuerying ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span> : '確認查詢'}
+                                            確認查詢
                                         </button>
                                     </div>
                                 )}
@@ -955,19 +776,11 @@
                                     
                                     <div className="grid grid-cols-3 gap-3 mb-2">
                                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                                            <button key={num} onClick={() => handleNumpad(num.toString())} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
-                                                {num}
-                                            </button>
+                                            <button key={num} onClick={() => handleNumpad(num.toString())} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">{num}</button>
                                         ))}
-                                        <button onClick={() => handleNumpad('00')} className="bg-white py-4 rounded-2xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
-                                            00
-                                        </button>
-                                        <button onClick={() => handleNumpad('0')} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">
-                                            0
-                                        </button>
-                                        <button onClick={() => handleNumpad('delete')} className="bg-slate-200 py-4 rounded-2xl text-2xl font-extrabold text-slate-600 shadow-sm border border-slate-300 active:bg-slate-300 active:scale-95 transition-all flex justify-center items-center">
-                                            ⌫
-                                        </button>
+                                        <button onClick={() => handleNumpad('00')} className="bg-white py-4 rounded-2xl text-xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">00</button>
+                                        <button onClick={() => handleNumpad('0')} className="bg-white py-4 rounded-2xl text-2xl font-extrabold text-slate-700 shadow-sm border border-slate-100 active:bg-teal-50 active:scale-95 transition-all">0</button>
+                                        <button onClick={() => handleNumpad('delete')} className="bg-slate-200 py-4 rounded-2xl text-2xl font-extrabold text-slate-600 shadow-sm border border-slate-300 active:bg-slate-300 active:scale-95 transition-all flex justify-center items-center">⌫</button>
                                     </div>
                                 </div>
                                 
@@ -989,16 +802,9 @@
                                 <h3 className="font-extrabold text-2xl text-slate-800 mb-2">確認發送點數？</h3>
                                 <p className="text-slate-600 font-medium bg-slate-50 py-3 rounded-xl border border-slate-100 mb-4">即將發送 <strong className="text-teal-600 text-3xl mx-1">{calculatedPoints}</strong> 點給該遊客</p>
                                 
-                                {calculatedPoints >= 10 && (
-                                    <div className="bg-rose-50 border-2 border-rose-200 p-4 rounded-xl animate-pulse">
-                                        <p className="text-rose-600 font-bold text-sm">⚠️ 系統防呆警告</p>
-                                        <p className="text-rose-500 text-xs mt-1">單筆發送達 {calculatedPoints} 點 (消費 {parsedAmount} 元)。請再次確認金額是否輸入錯誤？</p>
-                                    </div>
-                                )}
-                                
                                 <div className="flex space-x-3 mt-8">
                                     <button onClick={() => setScanStatus('found')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
-                                    <button onClick={handleSubmit} className={`flex-[2] py-4 rounded-2xl font-bold text-white shadow-lg active:scale-95 text-lg transition-colors ${calculatedPoints >= 10 ? 'bg-rose-500 hover:bg-rose-600' : 'bg-teal-600 hover:bg-teal-700'}`}>確認送出</button>
+                                    <button onClick={handleSubmit} className={`flex-[2] py-4 rounded-2xl font-bold text-white shadow-lg active:scale-95 text-lg transition-colors bg-teal-600 hover:bg-teal-700`}>確認送出</button>
                                 </div>
                             </div>
                         )}
