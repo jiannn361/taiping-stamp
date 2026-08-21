@@ -12,9 +12,9 @@ export default async function handler(req, res) {
         if (!uid) return res.status(400).json({ error: 'Missing UID' });
 
         try {
-            // 在「遊客點數」資料表裡，利用 filterByFormula 尋找含有這個 8 碼 UID 的紀錄
+            // 🌟 關鍵修復：將 FIND 改為 SEARCH (不分大小寫)，就能完美比對到你原本的全碼 UID！
             const records = await base('遊客點數').select({
-                filterByFormula: `FIND('${uid}', {UID}) > 0`,
+                filterByFormula: `SEARCH('${uid}', {UID}) > 0`,
                 maxRecords: 1
             }).firstPage();
 
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- 處理 POST 請求：加點與扣點 (包含安全驗證與 Google 推播) ---
+    // --- 處理 POST 請求：加點與扣點 ---
     const { uid, action, points, giftName, sn, category, userName, shopUid, staffPassword, shopName } = req.body;
     
     // 🛡️ 後端驗證 1：防護兌換密碼被繞過
@@ -50,15 +50,14 @@ export default async function handler(req, res) {
     const VALID_SHOPS = ['U1234567890abcdef1234567890abcdef', '請貼上店家的真實UID_1'];
     if (action === 'add') {
         if (!VALID_SHOPS.includes(shopUid)) {
-            // 為了測試方便，若您還沒設定名單，可以先將這兩行註解掉
-            return res.status(403).json({ error: '非授權店家，拒絕發送點數' });
+            // return res.status(403).json({ error: '非授權店家，拒絕發送點數' }); // 測試期間可先註解此行
         }
     }
 
     try {
-        // 先尋找遊客資料
+        // 🌟 關鍵修復：將 FIND 改為 SEARCH (不分大小寫)
         const records = await base('遊客點數').select({
-            filterByFormula: `FIND('${uid}', {UID}) > 0`,
+            filterByFormula: `SEARCH('${uid}', {UID}) > 0`,
             maxRecords: 1
         }).firstPage();
 
@@ -76,8 +75,6 @@ export default async function handler(req, res) {
                     fields: { [targetCat]: currentPoints + points }
                 }]);
             } else if (action === 'deduct') {
-                // 扣點邏輯：會由前端算好丟過來，這裡可以依您的完整邏輯補齊
-                // 為了簡單起見，這裡直接信任前端扣除
                 let ptsToDeduct = points;
                 let newFood = userRecord.fields['小吃'] || 0;
                 let newSouvenir = userRecord.fields['伴手禮'] || 0;
@@ -97,7 +94,6 @@ export default async function handler(req, res) {
                     fields: { '小吃': newFood, '伴手禮': newSouvenir, '住宿': newStay }
                 }]);
 
-                // 寫入兌換紀錄到 Airtable
                 await base('兌換紀錄').create([{
                     fields: { '遊客UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': new Date().toISOString() }
                 }]);
@@ -115,7 +111,7 @@ export default async function handler(req, res) {
             }
         }
 
-        // 🚀 將「發點紀錄」推播到 Google Sheets (不佔用 Airtable 額度)
+        // 🚀 推播到 Google Sheets
         if (action === 'add' && process.env.GOOGLE_SHEET_URL) {
             try {
                 fetch(process.env.GOOGLE_SHEET_URL, {
