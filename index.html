@@ -44,18 +44,11 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // ⚠️ 前端的這份名單現在只用來「切換介面」，真正的安全檢查已經移到 api/points.js 後端！
         const SHOP_ADMINS = {
-            'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food', typeName: '小吃', color: 'text-amber-500' },
-            '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir', typeName: '伴手禮', color: 'text-pink-400' },
-            '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay', typeName: '住宿', color: 'text-indigo-500' }
+            'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街測試店家', category: 'food' },
+            '請貼上店家的真實UID_1': { id: 'S02', name: '某某特色伴手禮', category: 'souvenir' },
+            '請貼上店家的真實UID_2': { id: 'S03', name: '高山茶語民宿', category: 'stay' }
         };
-
-        const CloudIcon = ({ className }) => (
-            <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-                <path d="M17.5 19c2.76 0 5-2.24 5-5s-2.24-5-5-5c-.17 0-.34.02-.51.05C16.43 6.13 13.93 4 11 4c-3.87 0-7 3.13-7 7 0 .17 0 .34.02.51C1.75 11.96 0 13.71 0 16c0 2.76 2.24 5 5 5h12.5z"/>
-            </svg>
-        );
 
         const Toast = ({ message }) => {
             if (!message) return null;
@@ -72,9 +65,7 @@
             const [isLiffInit, setIsLiffInit] = useState(false);
             const [userProfile, setUserProfile] = useState(null);
             const [toastMsg, setToastMsg] = useState(null);
-            
-            // 🛡️ 新增：網路錯誤或未登入狀態
-            const [authError, setAuthError] = useState(false); 
+            const [liffError, setLiffError] = useState(null);
 
             const showToast = (msg) => {
                 setToastMsg(msg);
@@ -100,32 +91,27 @@
                             setIsLiffInit(true);
                         }
                     } catch (err) {
-                        // 🛡️ 拔除測試帳號：網路不穩時強制阻擋，避免點數錯亂
-                        setAuthError(true);
-                        setIsLiffInit(true);
+                        setLiffError("系統初始化失敗，請確認網路狀態後重新整理網頁！");
                     }
                 };
                 initLiff();
             }, []);
+
+            if (liffError) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-rose-50 text-rose-600 p-6 text-center">
+                        <div className="text-4xl mb-4">⚠️</div>
+                        <div className="font-bold tracking-wider mb-2">{liffError}</div>
+                        <button onClick={() => window.location.reload()} className="mt-4 bg-rose-500 text-white px-6 py-2 rounded-full font-bold shadow-sm">重新整理</button>
+                    </div>
+                );
+            }
 
             if (!isLiffInit) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-teal-600">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-teal-600 mb-4"></div>
                         <div className="font-bold tracking-wider text-slate-600">系統載入中...</div>
-                    </div>
-                );
-            }
-
-            if (authError) {
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen bg-rose-50 text-rose-600 p-8 text-center">
-                        <div className="text-5xl mb-4">⚠️</div>
-                        <div className="font-bold text-xl mb-2">網路連線異常</div>
-                        <div className="text-sm text-rose-500 mb-6 font-medium">無法驗證您的身分，為保障點數安全，請確認網路穩定後重新開啟網頁。</div>
-                        <button onClick={() => window.location.reload()} className="bg-rose-500 text-white font-bold py-3 px-8 rounded-full shadow-md active:scale-95 transition-transform">
-                            重新整理
-                        </button>
                     </div>
                 );
             }
@@ -151,7 +137,7 @@
                     <div className="flex-1 overflow-y-auto bg-slate-50 hide-scrollbar relative">
                         {role === 'customer' 
                             ? <CustomerView userProfile={userProfile} showToast={showToast} /> 
-                            : <ShopView activeShop={activeShop} userProfile={userProfile} showToast={showToast} />
+                            : <ShopView userProfile={userProfile} activeShop={activeShop} showToast={showToast} />
                         }
                     </div>
                 </div>
@@ -159,7 +145,7 @@
         }
 
         function CustomerView({ userProfile, showToast }) {
-            const [activeTab, setActiveTab] = useState('card'); 
+            const [activeTab, setActiveTab] = useState('map'); 
             const [redeemModal, setRedeemModal] = useState(null); 
             const [staffPassword, setStaffPassword] = useState('');
             const [showBindingModal, setShowBindingModal] = useState(false);
@@ -169,29 +155,25 @@
             
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
-
             const [listCategory, setListCategory] = useState('all');
 
-            const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0 });
+            const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
-            // 🛡️ 升級：產生 8 碼短碼防撞號
-            const rawUid = userProfile?.userId;
+            // 🌟 升級為 8 碼短碼，防撞號
+            const rawUid = userProfile?.userId || 'GUEST_MODE_UID';
             const shortUid = rawUid.slice(-8).toUpperCase();
-            const nameString = userProfile?.displayName;
+            const nameString = userProfile?.displayName || '遊客';
 
             useEffect(() => {
                 let isMounted = true;
                 const fetchPoints = async () => {
                     try {
-                        // 使用完整 UID 或短碼查詢
-                        const res = await fetch(`/api/points?uid=${rawUid}`);
+                        const res = await fetch(`/api/points?uid=${shortUid}`);
                         if (res.ok && isMounted) {
                             const data = await res.json();
                             if (data.food !== undefined) {
-                                setCustomerPoints({ food: data.food, souvenir: data.souvenir, stay: data.stay });
-                                // 🛡️ 從雲端更新歷史紀錄
-                                if (data.history) setRedeemHistory(data.history);
+                                setCustomerPoints(data);
                             }
                         }
                     } catch(e) {}
@@ -199,9 +181,8 @@
                 
                 fetchPoints(); 
                 const interval = setInterval(fetchPoints, 15000); 
-                
                 return () => { isMounted = false; clearInterval(interval); };
-            }, [rawUid]);
+            }, [shortUid]);
 
             useEffect(() => {
                 let isMounted = true;
@@ -214,7 +195,8 @@
                 return () => { isMounted = false; };
             }, [activeTab]);
 
-            const totalPoints = customerPoints.food + customerPoints.souvenir + customerPoints.stay;
+            // 取後台算好的總點數，若無則自行相加
+            const totalPoints = customerPoints.total || (customerPoints.food + customerPoints.souvenir + customerPoints.stay);
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -229,12 +211,12 @@
             };
 
             const confirmStaffRedeem = async () => {
-                if (!staffPassword) {
-                    showToast('❌ 請輸入工作人員密碼！');
+                if (staffPassword !== '8888') {
+                    showToast('❌ 工作人員密碼錯誤！');
                     return;
                 }
                 
-                showToast('⏳ 系統處理中，寫入雲端紀錄...');
+                showToast('⏳ 系統處理中...');
                 const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
 
                 try {
@@ -242,25 +224,23 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            uid: rawUid, // 傳送完整 UID
+                            uid: shortUid,
                             userName: nameString,
                             action: 'deduct',
                             points: redeemModal.cost,
                             giftName: redeemModal.name,
                             sn: serialNumber,
-                            password: staffPassword // 🛡️ 密碼傳給後端驗證
+                            staffPassword: staffPassword // 傳送密碼給後端驗證
                         })
                     });
 
-                    const responseData = await res.json();
-
                     if (!res.ok) {
-                        showToast(`❌ 扣點失敗：${responseData.error || '點數異常'}`);
+                        const err = await res.json();
+                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
                         return;
                     }
 
                     showToast('✅ 核銷成功！');
-                    
                     const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
 
@@ -271,6 +251,7 @@
                         if (newPoints[cat] >= ptsToDeduct) { newPoints[cat] -= ptsToDeduct; ptsToDeduct = 0; }
                         else { ptsToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
                     }
+                    newPoints.total -= redeemModal.cost;
                     setCustomerPoints(newPoints);
 
                     setRedeemModal(null);
@@ -280,37 +261,10 @@
                 }
             };
 
-            const renderStickers = () => {
-                let stickers = [];
-                for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
-                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#D3DC7C]');
-                for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
-
-                const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
-                const slots = [];
-                for(let i=0; i<totalSlots; i++) {
-                    if (stickers[i]) {
-                        slots.push(
-                            <div key={i} className="relative flex items-center justify-center w-12 h-12 transform hover:scale-110 transition-transform">
-                                <CloudIcon className={`w-14 h-14 ${stickers[i]} absolute z-10 drop-shadow-sm`} />
-                                <span className="z-20 text-white text-xs font-bold pt-1">{i + 1}</span>
-                            </div>
-                        );
-                    } else {
-                        slots.push(
-                            <div key={i} className="relative flex items-center justify-center w-12 h-12 opacity-50">
-                                <CloudIcon className="w-14 h-14 text-white absolute z-10" />
-                                <span className="z-20 text-teal-200 text-xs font-bold pt-1">{i + 1}</span>
-                            </div>
-                        );
-                    }
-                }
-                return slots;
-            };
-
-            const getProcessedShops = () => {
+            // 洗牌演算法
+            const processedShops = React.useMemo(() => {
                 let filtered = shopsData;
-                if (listCategory !== 'all') {
+                if (listCategory && listCategory !== 'all') {
                     filtered = shopsData.filter(shop => {
                         const cat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : (shop.category || '').toLowerCase();
                         if (listCategory === 'food') return cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳') || cat.includes('美食');
@@ -319,18 +273,15 @@
                         return false;
                     });
                 }
-                
-                // 每次打開列表都洗牌 (Fisher-Yates Shuffle)
-                for (let i = filtered.length - 1; i > 0; i--) {
+                const shuffled = [...filtered];
+                for (let i = shuffled.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
-                    [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
                 }
-                return filtered;
-            };
+                return shuffled;
+            }, [shopsData, listCategory]);
 
-            const processedShops = React.useMemo(() => getProcessedShops(), [listCategory, shopsData]);
-            
-            // 🛡️ 升級：QR Code 直接藏入完整的 33 碼 LINE UID，絕不撞號
+            // 完整 UID 藏在 QR Code 中
             const qrData = encodeURIComponent(`${rawUid}|${nameString}`);
 
             return (
@@ -353,13 +304,10 @@
                         </div>
 
                         <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 border border-white/60 shadow-sm mt-4 mx-2">
-                            <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
-                                {renderStickers()}
-                            </div>
-                            <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50"></span>小吃</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50"></span>伴手禮</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50"></span>住宿</span>
+                            <div className="flex justify-center space-x-4 text-sm text-teal-900 font-bold py-2">
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50"></span>小吃: {customerPoints.food}</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50"></span>伴手禮: {customerPoints.souvenir}</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50"></span>住宿: {customerPoints.stay}</span>
                             </div>
                         </div>
                     </div>
@@ -375,7 +323,7 @@
 
                         <div className="text-center relative z-10 w-full px-4">
                             <div className="text-[10px] text-slate-400 font-bold mb-1">若無法掃描，請提供下方代碼給店家</div>
-                            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl py-3 px-4 font-mono text-3xl font-extrabold text-teal-600 tracking-[0.2em] shadow-inner flex justify-center items-center">
+                            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl py-3 px-4 font-mono text-2xl font-extrabold text-teal-600 tracking-[0.2em] shadow-inner flex justify-center items-center">
                                 {shortUid}
                             </div>
                         </div>
@@ -421,7 +369,7 @@
                             </div>
 
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄 (雲端同步)</h3>
+                                <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄 (本次登入)</h3>
                                 {redeemHistory.length === 0 ? (
                                     <p className="text-center text-slate-400 text-sm py-4">尚無兌換紀錄</p>
                                 ) : (
@@ -458,59 +406,66 @@
                                     <MapComponent onMarkerClick={setSelectedShop} activeTab={activeTab} shops={shopsData} />
                                 </div>
                             ) : (
-                                <div className="space-y-3 animate-fade-in pb-10">
-                                    {/* 恢復橫向三個並排的大按鈕 */}
-                                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                <div className="space-y-4 animate-fade-in pb-10">
+                                    {/* 🌟 恢復橫向三個按鈕，並套用春日新色 */}
+                                    <div className="grid grid-cols-3 gap-3">
                                         {[
-                                            { id: 'food', name: '小吃/餐廳', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900', border: 'border-amber-200' },
-                                            { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900', border: 'border-lime-200' },
-                                            { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900', border: 'border-emerald-200' }
-                                        ].map(cat => (
-                                            <button 
-                                                key={cat.id}
-                                                onClick={() => setListCategory(listCategory === cat.id ? 'all' : cat.id)}
-                                                className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all duration-200 active:scale-95 ${listCategory === cat.id ? `${cat.bg} ${cat.border} shadow-md` : 'bg-white border-slate-100 hover:bg-slate-50'}`}
-                                            >
-                                                <span className={`text-3xl mb-1 ${listCategory === cat.id ? 'scale-110 transition-transform' : 'opacity-70'}`}>{cat.icon}</span>
-                                                <span className={`text-xs font-bold ${listCategory === cat.id ? cat.text : 'text-slate-500'}`}>{cat.name}</span>
-                                            </button>
-                                        ))}
+                                            { id: 'food', name: '小吃', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
+                                            { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900' },
+                                            { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' }
+                                        ].map(cat => {
+                                            const isActive = listCategory === cat.id;
+                                            return (
+                                                <button 
+                                                    key={cat.id} 
+                                                    onClick={() => setListCategory(isActive ? 'all' : cat.id)}
+                                                    className={`py-4 rounded-2xl flex flex-col items-center justify-center transition-all ${isActive ? `${cat.bg} shadow-md scale-105 ring-2 ring-white` : 'bg-slate-100 opacity-60 hover:opacity-100'}`}
+                                                >
+                                                    <span className="text-2xl mb-1">{cat.icon}</span>
+                                                    <span className={`text-sm font-bold ${isActive ? cat.text : 'text-slate-500'}`}>{cat.name}</span>
+                                                </button>
+                                            )
+                                        })}
                                     </div>
 
-                                    {shopsData.length === 0 ? (
-                                        <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
-                                    ) : processedShops.length === 0 ? (
-                                        <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
-                                    ) : (
-                                        processedShops.map(shop => {
-                                            const shopCat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : (shop.category || '').toLowerCase();
-                                            let style = { icon: '📍', bg: 'bg-slate-100', text: 'text-slate-600' };
-                                            if (shopCat.includes('小吃') || shopCat.includes('food') || shopCat.includes('餐廳')) style = { icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' };
-                                            else if (shopCat.includes('伴手禮') || shopCat.includes('gift')) style = { icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900' };
-                                            else if (shopCat.includes('住宿') || shopCat.includes('stay')) style = { icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' };
+                                    <div className="mt-6 space-y-3">
+                                        {shopsData.length === 0 ? (
+                                            <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
+                                        ) : processedShops.length === 0 ? (
+                                            <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
+                                        ) : (
+                                            processedShops.map(shop => {
+                                                const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : (shop.category || '').toLowerCase();
+                                                let icon = '📍';
+                                                if (catStr.includes('小吃') || catStr.includes('food') || catStr.includes('餐廳')) icon = '🍔';
+                                                else if (catStr.includes('伴手禮') || catStr.includes('gift')) icon = '🎁';
+                                                else if (catStr.includes('住宿') || catStr.includes('stay')) icon = '🏠';
 
-                                            return (
-                                                <div key={shop.id} onClick={() => setSelectedShop(shop)} className="w-full bg-white border border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm cursor-pointer hover:border-teal-300 transition-all active:scale-95">
-                                                    <div className="flex-1 flex items-center space-x-3">
-                                                        <div className={`w-10 h-10 min-w-[40px] rounded-full flex items-center justify-center text-lg ${style.bg}`}>
-                                                            {style.icon}
-                                                        </div>
-                                                        <div className="flex-1 overflow-hidden">
-                                                            <h4 className="font-bold text-slate-800 text-[17px] mb-1.5 truncate">{shop.name}</h4>
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {shop.services && shop.services.split(/[,、，]/).map((srv, idx) => srv.trim() && (
-                                                                    <span key={idx} className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${style.bg} ${style.text} shadow-sm border border-white/50`}>
-                                                                        {srv.trim()}
-                                                                    </span>
-                                                                ))}
+                                                return (
+                                                    <div key={shop.id} onClick={() => setSelectedShop(shop)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between cursor-pointer hover:border-teal-300 transition-colors active:scale-95">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-xl">{icon}</span>
+                                                                <h4 className="font-bold text-slate-800 text-lg">{shop.name}</h4>
                                                             </div>
+                                                            
+                                                            {/* 🌟 替換為空心邊框的服務項目標籤 */}
+                                                            {shop.services && (
+                                                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                                                    {shop.services.split(/[,、]/).map((service, i) => service.trim() && (
+                                                                        <span key={i} className="text-[11px] bg-transparent text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-300">
+                                                                            {service.trim()}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
+                                                        <div className="text-slate-300 font-bold text-xl ml-3">❯</div>
                                                     </div>
-                                                    <div className="text-slate-300 font-bold text-xl ml-3">❯</div>
-                                                </div>
-                                            )
-                                        })
-                                    )}
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -577,13 +532,13 @@
 
                                     <div className="bg-slate-100 p-3 rounded-xl font-mono text-[10px] text-slate-500 break-all mb-6 font-bold border-2 border-slate-200 text-left">
                                         請複製全碼傳給大會：<br/>
-                                        <span className="text-slate-800 text-xs">{rawUid || "無法取得"}</span>
+                                        <span className="text-slate-800 text-xs">{userProfile ? userProfile.userId : "無法取得"}</span>
                                     </div>
                                     <div className="flex flex-col space-y-3">
                                         <button onClick={() => {
                                             if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
                                             if(!applyShopCategory) { showToast('❌ 請選擇您的主要發送點數類別'); return;}
-                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A主要類別：${applyShopCategory}%0A我的代碼是：${rawUid}`, '_blank');
+                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A主要類別：${applyShopCategory}%0A我的代碼是：${userProfile?.userId}`, '_blank');
                                         }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
@@ -592,7 +547,6 @@
                         </div>
                     )}
 
-                    {/* 🌟 店家詳細資訊彈出視窗 */}
                     {selectedShop && (
                         <div className="fixed inset-0 z-[150] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedShop(null)}>
                             <div className="bg-white w-full max-w-[400px] mx-auto rounded-t-3xl overflow-hidden shadow-2xl animate-slide-up flex flex-col max-h-[85vh] relative" onClick={e => e.stopPropagation()}>
@@ -600,14 +554,20 @@
                                 <div className="overflow-y-auto px-6 pb-8 pt-8">
                                     <h2 className="text-2xl font-extrabold text-slate-800 leading-tight mb-2">{selectedShop.name}</h2>
                                     
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {selectedShop.services && selectedShop.services.split(/[,、，]/).map((srv, idx) => srv.trim() && (
-                                            <span key={idx} className="bg-teal-50 text-teal-700 text-xs px-2.5 py-1 rounded-md font-bold border border-teal-100 shadow-sm">{srv.trim()}</span>
-                                        ))}
+                                    {selectedShop.services && (
+                                        <div className="mt-1 mb-4 flex flex-wrap gap-1.5">
+                                            {selectedShop.services.split(/[,、]/).map((service, i) => service.trim() && (
+                                                <span key={i} className="text-[11px] bg-transparent text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-300">
+                                                    {service.trim()}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3 mb-6">
+                                        {selectedShop.address && <div className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-tight">📍 <span>{selectedShop.address}</span></div>}
                                     </div>
 
-                                    {selectedShop.address && <div className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-tight mb-4">📍 <span>{selectedShop.address}</span></div>}
-                                    
                                     {selectedShop.description && (
                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed text-justify mb-6">
                                             {selectedShop.description.split('\n').map((line, idx) => {
@@ -626,16 +586,16 @@
                                         </div>
                                     )}
                                     
-                                    {/* 縮小版：導航與撥打電話並排 */}
-                                    <div className="flex gap-3 mt-4">
+                                    {/* 🌟 導航與電話並排設計 */}
+                                    <div className="flex gap-3">
                                         <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
-                                           className="flex-1 flex items-center justify-center gap-2 bg-[#0f766e] text-white text-sm font-bold py-3.5 rounded-xl shadow-md hover:bg-[#115e59] transition-colors active:scale-95">
-                                            🗺️ 開啟導航
+                                           className="flex-1 flex items-center justify-center gap-2 bg-[#0f766e] text-white text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-[#115e59] transition-colors active:scale-95">
+                                            🗺️ 導航
                                         </a>
                                         {selectedShop.phone && (
                                             <a href={`tel:${selectedShop.phone}`} 
-                                               className="flex-1 flex items-center justify-center gap-2 bg-slate-100 text-slate-700 text-sm font-bold py-3.5 rounded-xl shadow-sm border border-slate-200 hover:bg-slate-200 transition-colors active:scale-95">
-                                                📞 撥打電話
+                                               className="flex-1 flex items-center justify-center gap-2 bg-slate-100 text-slate-700 text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-slate-200 border border-slate-200 transition-colors active:scale-95">
+                                                📞 撥號
                                             </a>
                                         )}
                                     </div>
@@ -688,10 +648,10 @@
                             bounds.push([shop.lat, shop.lng]);
                             const customHtml = `
                                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translate(-50%, -100%); width: max-content;">
-                                  <div style="background-color: #fff; border: 3px solid ${getCategoryColor(shop.category)}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                                  <div style="background-color: #ffffff; border: 3px solid ${getCategoryColor(shop.category)}; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                                     <span style="font-size: 18px;">${getCategoryEmoji(shop.category)}</span>
                                   </div>
-                                  <div style="background-color: rgba(255, 255, 255, 0.95); color: #334155; padding: 4px 8px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 12px; font-weight: bold; margin-top: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">${shop.name}</div>
+                                  <div style="background-color: rgba(255, 255, 255, 0.95); color: #334155; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">${shop.name}</div>
                                 </div>
                             `;
                             const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
@@ -707,7 +667,7 @@
             return <div id="map-container" className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>;
         }
 
-        function ShopView({ activeShop, userProfile, showToast }) {
+        function ShopView({ userProfile, activeShop, showToast }) {
             const [scanStatus, setScanStatus] = useState('idle'); 
             const [inputMode, setInputMode] = useState('scan'); 
             const [manualCode, setManualCode] = useState(''); 
@@ -738,6 +698,7 @@
                         { fps: 10, qrbox: { width: 250, height: 250 } },
                         (decodedText) => {
                             scanner.stop().then(() => {
+                                // 支援新版完整 UID 格式 (uid|name)
                                 const parts = decodedText.split('|');
                                 setScannedUid(parts[0]);
                                 setScannedName(parts[1] || '未知遊客');
@@ -761,7 +722,7 @@
             }, [scanStatus, inputMode]);
 
             const handleManualSearch = async () => {
-                if (manualCode.length < 8) return;
+                if (manualCode.length < 8) return; // 短碼改為 8 碼
                 setIsQuerying(true);
                 showToast('⏳ 查詢遊客資料中...');
                 try {
@@ -800,12 +761,14 @@
                 showToast('⏳ 正在傳送點數...');
 
                 try {
+                    // 🌟 自動打包 shopName 與 shopUid 傳給 API
                     const payload = {
                         uid: scannedUid,
                         action: 'add',
                         category: activeShop.category,
                         points: calculatedPoints,
-                        shopUid: userProfile.userId // 🛡️ 傳送真實店家身分驗證
+                        shopUid: userProfile?.userId, // 後端認證店家身分用
+                        shopName: activeShop.name     // Google Sheets 紀錄店名用
                     };
                     
                     if (scannedName && scannedName !== '手動輸入新遊客' && scannedName !== '無網路(手動鎖定)') {
@@ -822,7 +785,7 @@
                         showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
                         
                         const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                        setRecentRecords(prev => [{ time: timeStr, uid: scannedUid, name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
+                        setRecentRecords(prev => [{ time: timeStr, uid: scannedUid.slice(-8), name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
                         setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
 
                         setAmount('');
@@ -852,7 +815,7 @@
                 if (val === 'delete') {
                     setManualCode(prev => prev.slice(0, -1));
                 } else {
-                    if (manualCode.length < 8) setManualCode(prev => prev + val); // 🛡️ 更新為 8 碼限制
+                    if (manualCode.length < 8) setManualCode(prev => prev + val); // 短碼 8 碼上限
                 }
             };
 
@@ -893,7 +856,7 @@
                                         <p className="text-sm font-bold text-slate-600 mb-2">請輸入遊客畫面的 8 碼代碼</p>
                                         
                                         <div className="relative w-full mb-4">
-                                            <div className="w-full bg-white border-2 border-slate-300 rounded-2xl pr-12 pl-4 py-4 h-16 flex items-center justify-center text-4xl font-mono text-teal-600 font-extrabold tracking-[0.2em] shadow-sm">
+                                            <div className="w-full bg-white border-2 border-slate-300 rounded-2xl pr-12 pl-4 py-4 h-16 flex items-center justify-center text-4xl font-mono text-teal-600 font-extrabold tracking-widest shadow-sm">
                                                 {manualCode || <span className="text-slate-300 tracking-normal text-lg font-sans">點擊下方鍵盤</span>}
                                             </div>
                                             
@@ -918,7 +881,7 @@
                                         </div>
 
                                         <button 
-                                            disabled={manualCode.length < 8 || isQuerying} // 🛡️ 升級：防撞號 8 碼檢查
+                                            disabled={manualCode.length < 8 || isQuerying}
                                             onClick={handleManualSearch}
                                             className={`w-full py-4 rounded-xl font-bold text-lg shadow-md transition-all flex justify-center items-center ${manualCode.length === 8 && !isQuerying ? 'bg-teal-500 hover:bg-teal-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}
                                         >
@@ -945,7 +908,7 @@
                             <div className="space-y-4 animate-fade-in">
                                 <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-center font-bold border border-emerald-200 flex flex-col items-center justify-center shadow-sm">
                                     <span className="text-lg">✅ 已鎖定：{scannedName}</span>
-                                    <span className="text-xs font-mono mt-1 opacity-80 bg-white px-3 py-1 rounded-full border border-emerald-100 overflow-hidden text-ellipsis max-w-full">UID: {scannedUid}</span>
+                                    <span className="text-xs font-mono mt-1 opacity-80 bg-white px-3 py-1 rounded-full border border-emerald-100">UID: {scannedUid.slice(-8)}</span>
                                 </div>
                                 
                                 <div className="bg-slate-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
@@ -1020,7 +983,7 @@
                                             <span className="text-slate-400 text-xs mt-0.5">{record.time}</span>
                                         </div>
                                         <div className="flex items-center space-x-3">
-                                            <span className="font-mono text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500 overflow-hidden text-ellipsis max-w-[80px]">{record.uid}</span>
+                                            <span className="font-mono text-xs bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">{record.uid}</span>
                                             <span className="font-extrabold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg">+{record.points} 點</span>
                                         </div>
                                     </div>
