@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         }
 
         // 這裡記得填入真實的店家 UID
-        const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24b', '請貼上店家的真實UID_1'];
+        const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24a', '請貼上店家的真實UID_1'];
         if (action === 'add') {
             if (!VALID_SHOPS.includes(shopUid)) {
                 // 測試期間可以先把這行註解掉，等確定名單後再開啟
