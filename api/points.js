@@ -1,30 +1,33 @@
 export default async function handler(req, res) {
-    // 🌟 全局防護罩：攔截所有不可預期的崩潰
     try {
         if (req.method !== 'POST' && req.method !== 'GET') {
             return res.status(405).json({ error: 'Method not allowed' });
         }
 
-        // 1. 檢查套件與環境變數 (避免未處理的崩潰)
         let Airtable;
         try {
             Airtable = require('airtable');
         } catch (e) {
+            console.error('缺少 airtable 套件');
             return res.status(500).json({ error: '系統缺少 airtable 套件' });
         }
 
-        if (!process.env.AIRTABLE_PAT || !process.env.AIRTABLE_BASE_ID) {
-            return res.status(500).json({ error: 'Vercel 環境變數遺失 (請檢查 PAT 與 BASE_ID)' });
+        // 🌟 修正：同時支援 AIRTABLE_PAT 或 AIRTABLE_API_KEY，避免名稱不一致導致崩潰
+        const apiKey = process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY;
+        const baseId = process.env.AIRTABLE_BASE_ID;
+
+        if (!apiKey || !baseId) {
+            console.error('Vercel 環境變數遺失: apiKey 或 baseId 為空');
+            return res.status(500).json({ error: 'Vercel 環境變數遺失 (請檢查 API Key 與 BASE_ID)' });
         }
 
-        const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.AIRTABLE_BASE_ID);
+        const base = new Airtable({ apiKey: apiKey }).base(baseId);
 
-        // 2. 處理 GET 請求
+        // --- 以下為原本的邏輯 ---
         if (req.method === 'GET') {
             const { uid } = req.query;
             if (!uid) return res.status(400).json({ error: 'Missing UID' });
 
-            // 🌟 修正 Airtable 空白欄位報錯 Bug: 加上 & '' 確保轉為字串
             const records = await base('遊客點數').select({
                 filterByFormula: `SEARCH(LOWER('${uid}'), LOWER({UID} & '')) > 0`,
                 maxRecords: 1
@@ -44,7 +47,6 @@ export default async function handler(req, res) {
             }
         }
 
-        // 3. 處理 POST 請求
         const body = req.body || {};
         const { uid, action, points, giftName, sn, category, userName, shopUid, staffPassword, shopName } = body;
 
@@ -54,16 +56,12 @@ export default async function handler(req, res) {
             }
         }
 
-        // 這裡記得填入真實的店家 UID
         const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24B', '請貼上店家的真實UID_1'];
         if (action === 'add') {
-            if (!VALID_SHOPS.includes(shopUid)) {
-                // 測試期間可以先把這行註解掉，等確定名單後再開啟
-                // return res.status(403).json({ error: '非授權店家，拒絕發送點數' });
-            }
+            // 測試期間可以先把這行註解掉
+            // if (!VALID_SHOPS.includes(shopUid)) { ... }
         }
 
-        // 🌟 同步修正 POST 寫入時的比對公式
         const records = await base('遊客點數').select({
             filterByFormula: `SEARCH(LOWER('${uid}'), LOWER({UID} & '')) > 0`,
             maxRecords: 1
@@ -140,7 +138,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true });
 
     } catch (error) {
-        // 🚀 捕捉最外層所有未知錯誤，並回傳真正的錯誤原因！
+        console.error('伺服器錯誤:', error);
         return res.status(500).json({ error: error.message || '發生未知的嚴重錯誤' });
     }
 }
