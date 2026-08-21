@@ -190,16 +190,30 @@
                 return () => { isMounted = false; clearInterval(interval); };
             }, [shortUid]);
 
-            useEffect(() => {
-                let isMounted = true;
-                if (activeTab === 'map' && shopsData.length === 0) {
-                    fetch('/api/shops')
-                        .then(res => res.json())
-                        .then(data => { if (isMounted) setShopsData(data); })
-                        .catch(e => console.error(e));
+           // ✅ 修改後的寫法（強制轉型防崩潰）
+useEffect(() => {
+    let isMounted = true;
+    if (activeTab === 'map' && shopsData.length === 0) {
+        fetch('/api/shops')
+            .then(async res => {
+                const data = await res.json().catch(() => ({})); // 避免 JSON 解析也崩潰
+                if (!res.ok) {
+                    console.error('API 錯誤:', data);
+                    return []; // 如果發生 500 錯誤，強制回傳空陣列
                 }
-                return () => { isMounted = false; };
-            }, [activeTab]);
+                return data;
+            })
+            .then(data => { 
+                // 雙重確認：確定拿到的是真正的陣列 (Array) 才寫入狀態
+                if (isMounted) setShopsData(Array.isArray(data) ? data : []); 
+            })
+            .catch(e => {
+                console.error('連線錯誤:', e);
+                if (isMounted) setShopsData([]); // 發生任何預期外的錯誤，都用空陣列兜底
+            });
+    }
+    return () => { isMounted = false; };
+}, [activeTab]);
 
             const totalPoints = customerPoints.total || (customerPoints.food + customerPoints.souvenir + customerPoints.stay);
 
