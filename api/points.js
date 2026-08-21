@@ -47,7 +47,8 @@ export default async function handler(req, res) {
 
     // 🛡️ 後端驗證 2：店家發點身分驗證 
     // 👉 記得將這裡替換成您真實店家的 LINE UID 陣列
-    const VALID_SHOPS = ['U1234567890abcdef1234567890abcdef', '請貼上店家的真實UID_1'];
+    const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24a', '請貼上店家的真實UID_1'];
+    const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24b', '請貼上店家的真實UID_2'];
     if (action === 'add') {
         if (!VALID_SHOPS.includes(shopUid)) {
             // return res.status(403).json({ error: '非授權店家，拒絕發送點數' }); // 測試期間可先註解此行
