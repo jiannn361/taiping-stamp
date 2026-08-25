@@ -119,7 +119,8 @@ export default async function handler(req, res) {
                         time: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
                         shopName: shopName || '未知店家',
                         shopUid: shopUid || '未知',
-                        userUid: uid,
+                        userUid: uid.slice(-8).toUpperCase(), // 🌟 修改這裡：直接轉成 8 碼大寫
+                        fullUid: uid,                         // 🌟 新增這裡：保留原本的完整 UID 備查
                         points: points,
                         category: targetCat
                     };
