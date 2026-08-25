@@ -88,7 +88,7 @@ export default async function handler(req, res) {
                     if (catObj.k === '住宿') newStay = catObj.v;
                 }
 
-                // 🌟 核心修改：先嘗試建立「兌換紀錄」
+                // 🌟 核心修改：先嘗試建立「兌換紀錄」，並加入遊客名稱
                 try {
                     // 轉換為台灣時間字串 (格式: YYYY-MM-DD HH:mm:ss)
                     const twTime = new Date().toLocaleString('zh-TW', { 
@@ -103,8 +103,8 @@ export default async function handler(req, res) {
                     }).replace(/\//g, '-');
 
                     await base('兌換紀錄').create([{
-                        // 注意：請確認您 Airtable 第一欄叫 'UID' 還是 '遊客UID'，請保持一致
-                        fields: { '遊客UID': uid, '遊客名稱': name, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': twTime }
+                        // 🌟 新增了 '遊客名稱': userName
+                        fields: { '遊客UID': uid, '遊客名稱': userName || '新遊客', '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': twTime }
                     }]);
                 } catch (err) {
                     console.error('寫入兌換紀錄失敗，終止扣點:', err);
