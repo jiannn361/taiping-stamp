@@ -88,13 +88,22 @@ export default async function handler(req, res) {
                     if (catObj.k === '住宿') newStay = catObj.v;
                 }
 
+                // 🌟 核心修改：先嘗試建立「兌換紀錄」
+                try {
+                    await base('兌換紀錄').create([{
+                        // 注意：請確認您 Airtable 第一欄叫 'UID' 還是 '遊客UID'，請保持一致
+                        fields: { 'UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': new Date().toISOString() }
+                    }]);
+                } catch (err) {
+                    console.error('寫入兌換紀錄失敗，終止扣點:', err);
+                    // 丟出錯誤，強制中斷程式，下方的扣點將【不會】執行！
+                    throw new Error(`兌換紀錄寫入失敗，點數已保留: ${err.message}`);
+                }
+
+                // 🌟 紀錄成功寫入後，才真正「扣除點數」
                 await base('遊客點數').update([{
                     id: userRecord.id,
                     fields: { '小吃': newFood, '伴手禮': newSouvenir, '住宿': newStay }
-                }]);
-
-                await base('兌換紀錄').create([{
-                    fields: { '遊客UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': new Date().toISOString() }
                 }]);
             }
         } else {
