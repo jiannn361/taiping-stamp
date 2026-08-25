@@ -12,7 +12,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: '系統缺少 airtable 套件' });
         }
 
-        // 🌟 修正：同時支援 AIRTABLE_PAT 或 AIRTABLE_API_KEY，避免名稱不一致導致崩潰
+        // 支援 AIRTABLE_PAT 或 AIRTABLE_API_KEY
         const apiKey = process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY;
         const baseId = process.env.AIRTABLE_BASE_ID;
 
@@ -23,7 +23,6 @@ export default async function handler(req, res) {
 
         const base = new Airtable({ apiKey: apiKey }).base(baseId);
 
-        // --- 以下為原本的邏輯 ---
         if (req.method === 'GET') {
             const { uid } = req.query;
             if (!uid) return res.status(400).json({ error: 'Missing UID' });
@@ -54,12 +53,6 @@ export default async function handler(req, res) {
             if (staffPassword !== '8888') {
                 return res.status(401).json({ error: '服務台密碼錯誤，拒絕執行' });
             }
-        }
-
-        const VALID_SHOPS = ['Ucf69096d6b2cbf209d63a7427491b24B', '請貼上店家的真實UID_1'];
-        if (action === 'add') {
-            // 測試期間可以先把這行註解掉
-            // if (!VALID_SHOPS.includes(shopUid)) { ... }
         }
 
         const records = await base('遊客點數').select({
@@ -116,22 +109,39 @@ export default async function handler(req, res) {
             }
         }
 
-        if (action === 'add' && process.env.GOOGLE_SHEET_URL) {
-            try {
-                fetch(process.env.GOOGLE_SHEET_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+        // 🌟 強化版的 Google Sheet 傳送邏輯
+        if (action === 'add') {
+            const sheetUrl = process.env.GOOGLE_SHEET_URL;
+            if (sheetUrl) {
+                console.log(`準備傳送至 Google Sheet: ${sheetUrl}`);
+                try {
+                    const sheetData = {
                         time: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
                         shopName: shopName || '未知店家',
                         shopUid: shopUid || '未知',
                         userUid: uid,
                         points: points,
                         category: targetCat
-                    })
-                }).catch(e => console.error('Google Sheet 推送失敗', e));
-            } catch (sheetError) {
-                console.error(sheetError);
+                    };
+                    
+                    const response = await fetch(sheetUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sheetData)
+                    });
+
+                    if (!response.ok) {
+                        console.error('Google Sheet 傳送失敗，狀態碼:', response.status);
+                        const text = await response.text();
+                        console.error('回傳內容:', text);
+                    } else {
+                        console.log('✅ 成功傳送至 Google Sheet');
+                    }
+                } catch (sheetError) {
+                    console.error('執行 Google Sheet fetch 時發生錯誤:', sheetError);
+                }
+            } else {
+                console.warn('⚠️ 尚未設定 GOOGLE_SHEET_URL，跳過傳送至 Google Sheet');
             }
         }
 
