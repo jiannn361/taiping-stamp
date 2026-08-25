@@ -151,7 +151,7 @@
             );
         }
 
-        function CustomerView({ userProfile, showToast }) {
+         function CustomerView({ userProfile, showToast }) {
             const [activeTab, setActiveTab] = useState('map'); 
             const [redeemModal, setRedeemModal] = useState(null); 
             const [staffPassword, setStaffPassword] = useState('');
@@ -162,7 +162,7 @@
             
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
-            const [listCategory, setListCategory] = useState('all');
+            const [listCategory, setListCategory] = useState(null); // 🌟 修改1：將預設值從 'all' 改為 null
 
             const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
@@ -282,16 +282,19 @@ useEffect(() => {
             };
 
             const processedShops = React.useMemo(() => {
-                let filtered = shopsData;
-                if (listCategory && listCategory !== 'all') {
-                    filtered = shopsData.filter(shop => {
-                        const cat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : (shop.category || '').toLowerCase();
-                        if (listCategory === 'food') return cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳') || cat.includes('美食');
-                        if (listCategory === 'souvenir') return cat.includes('伴手禮') || cat.includes('gift') || cat.includes('紀念');
-                        if (listCategory === 'stay') return cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿');
-                        return false;
-                    });
-                }
+                if (!Array.isArray(shopsData)) return [];
+                
+                // 🌟 修改2：如果還沒有選擇任何分類，就直接回傳空陣列
+                if (!listCategory) return []; 
+                
+                let filtered = shopsData.filter(shop => {
+                    const cat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
+                    if (listCategory === 'food') return cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳') || cat.includes('美食');
+                    if (listCategory === 'souvenir') return cat.includes('伴手禮') || cat.includes('gift') || cat.includes('紀念');
+                    if (listCategory === 'stay') return cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿');
+                    return false;
+                });
+                
                 const shuffled = [...filtered];
                 for (let i = shuffled.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -464,12 +467,13 @@ useEffect(() => {
                                             { id: 'food', name: '小吃', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
                                             { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900' },
                                             { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' }
-                                        ].map(cat => {
+                                         ].map(cat => {
                                             const isActive = listCategory === cat.id;
                                             return (
                                                 <button 
                                                     key={cat.id} 
-                                                    onClick={() => setListCategory(isActive ? 'all' : cat.id)}
+                                                    // 🌟 修改3：點擊切換時，如果已經是啟用狀態就設為 null (取消選擇)
+                                                    onClick={() => setListCategory(isActive ? null : cat.id)}
                                                     className={`py-4 rounded-2xl flex flex-col items-center justify-center transition-all ${isActive ? `${cat.bg} shadow-md scale-105 ring-2 ring-white` : 'bg-slate-100 opacity-60 hover:opacity-100'}`}
                                                 >
                                                     <span className="text-2xl mb-1">{cat.icon}</span>
@@ -482,11 +486,17 @@ useEffect(() => {
                                     <div className="mt-6 space-y-3">
                                         {shopsData.length === 0 ? (
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
+                                        ) : !listCategory ? (
+                                            // 🌟 修改4：加入提示文字，告訴使用者要先點擊上方分類
+                                            <div className="text-center py-12 text-slate-400 font-bold text-sm flex flex-col items-center">
+                                                <span className="text-3xl mb-3 animate-bounce">👆</span>
+                                                <span>請點選上方類別查看合作店家</span>
+                                            </div>
                                         ) : processedShops.length === 0 ? (
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
                                         ) : (
                                             processedShops.map(shop => {
-                                                const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : (shop.category || '').toLowerCase();
+                                                const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
                                                 let icon = '📍';
                                                 if (catStr.includes('小吃') || catStr.includes('food') || catStr.includes('餐廳')) icon = '🍔';
                                                 else if (catStr.includes('伴手禮') || catStr.includes('gift')) icon = '🎁';
