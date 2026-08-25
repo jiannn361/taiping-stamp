@@ -90,9 +90,21 @@ export default async function handler(req, res) {
 
                 // 🌟 核心修改：先嘗試建立「兌換紀錄」
                 try {
+                    // 轉換為台灣時間字串 (格式: YYYY-MM-DD HH:mm:ss)
+                    const twTime = new Date().toLocaleString('zh-TW', { 
+                        timeZone: 'Asia/Taipei', 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit',
+                        hour12: false 
+                    }).replace(/\//g, '-');
+
                     await base('兌換紀錄').create([{
                         // 注意：請確認您 Airtable 第一欄叫 'UID' 還是 '遊客UID'，請保持一致
-                        fields: { '遊客UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': new Date().toISOString() }
+                        fields: { 'UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': twTime }
                     }]);
                 } catch (err) {
                     console.error('寫入兌換紀錄失敗，終止扣點:', err);
