@@ -50,7 +50,7 @@ export default async function handler(req, res) {
         const { uid, action, points, giftName, sn, category, userName, shopUid, staffPassword, shopName } = body;
 
         if (action === 'deduct') {
-            if (staffPassword !== '8888') {
+            if (staffPassword !== '1688') {
                 return res.status(401).json({ error: '服務台密碼錯誤，拒絕執行' });
             }
         }
