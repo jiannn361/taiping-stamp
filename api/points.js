@@ -104,7 +104,7 @@ export default async function handler(req, res) {
 
                     await base('兌換紀錄').create([{
                         // 注意：請確認您 Airtable 第一欄叫 'UID' 還是 '遊客UID'，請保持一致
-                        fields: { '遊客UID': uid, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': twTime }
+                        fields: { '遊客UID': uid, '遊客名稱': name, '兌換獎項': giftName, '扣除點數': points, '核銷序號': sn, '時間': twTime }
                     }]);
                 } catch (err) {
                     console.error('寫入兌換紀錄失敗，終止扣點:', err);
