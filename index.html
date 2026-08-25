@@ -306,7 +306,7 @@ useEffect(() => {
             const renderStickers = () => {
                 let stickers = [];
                 for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
-                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#D3DC7C]');
+                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#FF9E79]');
                 for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
 
                 const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
@@ -358,7 +358,7 @@ useEffect(() => {
                             </div>
                             <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
                                 <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#D3DC7C] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FF9E79] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
                                 <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
                             </div>
                         </div>
@@ -465,7 +465,7 @@ useEffect(() => {
                                     <div className="grid grid-cols-3 gap-3">
                                         {[
                                             { id: 'food', name: '小吃', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
-                                            { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#D3DC7C]', text: 'text-lime-900' },
+                                            { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#FF9E79]', text: 'text-lime-900' },
                                             { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' }
                                          ].map(cat => {
                                             const isActive = listCategory === cat.id;
@@ -682,7 +682,7 @@ useEffect(() => {
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
                 if (cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳')) return '#FAD564';
-                if (cat.includes('伴手禮') || cat.includes('gift')) return '#D3DC7C';
+                if (cat.includes('伴手禮') || cat.includes('gift')) return '#FF9E79';
                 if (cat.includes('住宿') || cat.includes('stay')) return '#8EBD9D';
                 return '#1f2937'; 
             };
