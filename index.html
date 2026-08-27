@@ -160,6 +160,10 @@
             const [applyShopCategory, setApplyShopCategory] = useState(''); 
             const [selectedShop, setSelectedShop] = useState(null);
             
+            // 🌟 新增：自訂扣點 (紙本合併) 的狀態
+            const [isCustomRedeem, setIsCustomRedeem] = useState(false);
+            const [customPointsInput, setCustomPointsInput] = useState('');
+            
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
             const [listCategory, setListCategory] = useState(null); // 🌟 修改1：將預設值從 'all' 改為 null
@@ -275,6 +279,68 @@ useEffect(() => {
                     setCustomerPoints(newPoints);
 
                     setRedeemModal(null);
+                    setStaffPassword('');
+                } catch(e) {
+                    showToast('❌ 連線異常，請稍後再試。');
+                }
+            };
+
+            // 🌟 新增：自訂扣點 (紙本合併) 的處理邏輯
+            const confirmCustomRedeem = async () => {
+                const ptsToDeductInt = parseInt(customPointsInput, 10);
+                if (isNaN(ptsToDeductInt) || ptsToDeductInt <= 0) {
+                    showToast('❌ 請輸入有效的點數數字！');
+                    return;
+                }
+                if (ptsToDeductInt > totalPoints) {
+                    showToast('❌ 扣除點數不能大於遊客目前的總點數！');
+                    return;
+                }
+                if (staffPassword !== '1688') {
+                    showToast('❌ 工作人員密碼錯誤！');
+                    return;
+                }
+                
+                showToast('⏳ 系統處理中...');
+                const serialNumber = `M-${Math.floor(100000 + Math.random() * 900000)}`; // M 代表 Merge/Manual
+
+                try {
+                    const res = await fetch('/api/points', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            uid: shortUid,
+                            userName: nameString,
+                            action: 'deduct',
+                            points: ptsToDeductInt,
+                            giftName: `【紙本合併兌換】`,
+                            sn: serialNumber,
+                            staffPassword: staffPassword 
+                        })
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json();
+                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
+                        return;
+                    }
+
+                    showToast('✅ 特殊核銷成功！');
+                    const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    setRedeemHistory(prev => [{ giftName: `與紙本合併兌換 (扣 ${ptsToDeductInt} 點)`, sn: serialNumber, time: timeStr }, ...prev]);
+
+                    let remainingToDeduct = ptsToDeductInt;
+                    let newPoints = { ...customerPoints };
+                    for (let cat of ['food', 'souvenir', 'stay']) {
+                        if (remainingToDeduct <= 0) break;
+                        if (newPoints[cat] >= remainingToDeduct) { newPoints[cat] -= remainingToDeduct; remainingToDeduct = 0; }
+                        else { remainingToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
+                    }
+                    newPoints.total -= ptsToDeductInt;
+                    setCustomerPoints(newPoints);
+
+                    setIsCustomRedeem(false);
+                    setCustomPointsInput('');
                     setStaffPassword('');
                 } catch(e) {
                     showToast('❌ 連線異常，請稍後再試。');
@@ -408,6 +474,15 @@ useEffect(() => {
                                     </div>
                                 );
                             })}
+                            
+                            {/* 🌟 新增：服務台專用的「紙本合併扣點」按鈕 */}
+                            <div className="mt-8 pt-6 border-t-2 border-slate-100 border-dashed">
+                                <button onClick={() => setIsCustomRedeem(true)} className="w-full py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl text-sm border border-slate-200 hover:bg-slate-200 transition-colors flex items-center justify-center space-x-2">
+                                    <span className="text-lg">🔧</span>
+                                    <span>服務台專用：與紙本合併扣點</span>
+                                </button>
+                                <p className="text-[10px] text-center text-slate-400 mt-2">僅供遊客同時持紙本與電子點數時，由服務台操作</p>
+                            </div>
                         </div>
                     )}
 
@@ -554,6 +629,40 @@ useEffect(() => {
                                     <div className="flex space-x-3">
                                         <button onClick={() => {setRedeemModal(null); setStaffPassword('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">取消</button>
                                         <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600">確認扣點</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🌟 新增：自訂扣點專屬的彈出視窗 */}
+                    {isCustomRedeem && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
+                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
+                                <div className="bg-slate-700 p-4 text-center text-white">
+                                    <h3 className="font-bold text-lg">🔧 紙本合併特殊核銷</h3>
+                                </div>
+                                <div className="p-6 text-center">
+                                    <p className="text-sm text-slate-600 mb-4 font-bold">請輸入欲從手機扣除的點數</p>
+                                    
+                                    <input 
+                                        type="number" 
+                                        placeholder="欲扣除點數 (例: 10)" 
+                                        value={customPointsInput} 
+                                        onChange={(e) => setCustomPointsInput(e.target.value)}
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-3 outline-none focus:border-slate-400 transition-colors font-bold text-slate-700"
+                                    />
+                                    
+                                    <input 
+                                        type="password" 
+                                        placeholder="輸入服務台密碼" 
+                                        value={staffPassword} 
+                                        onChange={(e) => setStaffPassword(e.target.value)}
+                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none focus:border-rose-400 transition-colors"
+                                    />
+                                    <div className="flex space-x-3">
+                                        <button onClick={() => {setIsCustomRedeem(false); setStaffPassword(''); setCustomPointsInput('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">取消</button>
+                                        <button onClick={confirmCustomRedeem} className="flex-1 py-3 rounded-xl bg-slate-700 text-white font-bold shadow-md hover:bg-slate-800">確認扣除</button>
                                     </div>
                                 </div>
                             </div>
