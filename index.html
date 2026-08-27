@@ -152,7 +152,7 @@
         }
 
          function CustomerView({ userProfile, showToast }) {
-            const [activeTab, setActiveTab] = useState('map'); 
+            const [activeTab, setActiveTab] = useState('rules'); 
             const [redeemModal, setRedeemModal] = useState(null); 
             const [staffPassword, setStaffPassword] = useState('');
             const [showBindingModal, setShowBindingModal] = useState(false);
@@ -487,7 +487,7 @@ useEffect(() => {
                             <div className="mt-8 pt-6 border-t-2 border-slate-100 border-dashed animate-fade-in">
                                 <button onClick={() => { setIsCustomRedeem(true); setCustomRedeemStep(1); }} className="w-full py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl text-sm border border-slate-200 hover:bg-slate-200 transition-colors flex items-center justify-center space-x-2">
                                     <span className="text-lg">🔧</span>
-                                    <span>服務台專用扣點</span>
+                                    <span>服務台專用特殊核銷</span>
                                 </button>
                                 <p className="text-[10px] text-center text-slate-400 mt-2">僅供遊客同時持紙本與電子點數時，由服務台操作</p>
                             </div>
