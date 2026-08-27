@@ -805,6 +805,7 @@ useEffect(() => {
 
         function MapComponent({ onMarkerClick, activeTab, shops }) {
             const mapRef = useRef(null);
+            const containerRef = useRef(null); // 🌟 新增：使用 React 的 ref 來綁定 DOM，取代傳統的 ID
             
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
@@ -823,15 +824,13 @@ useEffect(() => {
                 return '#1f2937'; 
             };
 
+            // 🌟 修復 1：獨立的地圖「初始化與銷毀」區塊
             useEffect(() => {
-                let isMounted = true;
-                if (activeTab === 'map' && !mapRef.current) {
-                    const container = document.getElementById('map-container');
-                    if (container) container.innerHTML = ''; 
-                    const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
+                if (containerRef.current && !mapRef.current) {
+                    // 初始化地圖
+                    const map = L.map(containerRef.current, { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
                     
-                    // 🌟 修正地圖浮水印問題：更換為完全免費、不需 API Key 的 OpenStreetMap 官方圖磚
                     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                         maxZoom: 19,
                         attribution: '© OpenStreetMap contributors' 
@@ -841,19 +840,22 @@ useEffect(() => {
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
                 }
 
-                if (activeTab === 'map' && mapRef.current && shops && shops.length > 0) {
-                    const container = document.getElementById('map-container');
-                    if (container) container.innerHTML = ''; 
-                    const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
-                    L.control.zoom({ position: 'bottomright' }).addTo(map);
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
-                    mapRef.current = map;
-                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
-                }
+                // 🌟 關鍵修復：當離開這個分頁時，徹底銷毀地圖實體，避免 "already initialized" 衝突
+                return () => {
+                    if (mapRef.current) {
+                        mapRef.current.remove();
+                        mapRef.current = null;
+                    }
+                };
+            }, []); // 只有在組件載入和卸載時執行
 
-                if (activeTab === 'map' && mapRef.current && shops && shops.length > 0) {
+            // 🌟 修復 2：獨立的「繪製大頭針」區塊
+            useEffect(() => {
+                if (mapRef.current && shops && shops.length > 0) {
                     const map = mapRef.current;
+                    // 清除舊的大頭針
                     map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+                    
                     const bounds = [];
                     shops.forEach(shop => {
                         if (shop.lat && shop.lng) {
@@ -873,10 +875,9 @@ useEffect(() => {
                     });
                     if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
                 }
-                return () => { isMounted = false; };
-            }, [activeTab, onMarkerClick, shops]);
+            }, [shops, onMarkerClick]); // 當店家資料改變時才重新畫
 
-            return <div id="map-container" className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>;
+            return <div ref={containerRef} className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>;
         }
 
         function ShopView({ userProfile, activeShop, showToast }) {
