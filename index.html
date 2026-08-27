@@ -487,7 +487,7 @@ useEffect(() => {
                             <div className="mt-8 pt-6 border-t-2 border-slate-100 border-dashed animate-fade-in">
                                 <button onClick={() => { setIsCustomRedeem(true); setCustomRedeemStep(1); }} className="w-full py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl text-sm border border-slate-200 hover:bg-slate-200 transition-colors flex items-center justify-center space-x-2">
                                     <span className="text-lg">🔧</span>
-                                    <span>服務台專用：與紙本合併扣點</span>
+                                    <span>服務台專用扣點</span>
                                 </button>
                                 <p className="text-[10px] text-center text-slate-400 mt-2">僅供遊客同時持紙本與電子點數時，由服務台操作</p>
                             </div>
@@ -657,7 +657,7 @@ useEffect(() => {
                                     {customRedeemStep === 1 ? (
                                         // 第一階段：輸入密碼
                                         <div className="animate-fade-in">
-                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">步驟 1/2：請先驗證身分</p>
+                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">請先驗證身分</p>
                                             <input 
                                                 type="password" 
                                                 placeholder="請輸入服務台密碼" 
@@ -673,7 +673,7 @@ useEffect(() => {
                                             <div className="flex justify-center mb-2">
                                                 <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">✅ 密碼驗證通過</span>
                                             </div>
-                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">步驟 2/2：設定扣除額度</p>
+                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">設定扣除額度</p>
                                             
                                             <input 
                                                 type="number" 
