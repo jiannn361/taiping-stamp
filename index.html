@@ -830,6 +830,22 @@ useEffect(() => {
                     if (container) container.innerHTML = ''; 
                     const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
+                    
+                    // 🌟 修正地圖浮水印問題：更換為完全免費、不需 API Key 的 OpenStreetMap 官方圖磚
+                    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap contributors' 
+                    }).addTo(map);
+                    
+                    mapRef.current = map;
+                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
+                }
+
+                if (activeTab === 'map' && mapRef.current && shops && shops.length > 0) {
+                    const container = document.getElementById('map-container');
+                    if (container) container.innerHTML = ''; 
+                    const map = L.map('map-container', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
+                    L.control.zoom({ position: 'bottomright' }).addTo(map);
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
                     mapRef.current = map;
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
