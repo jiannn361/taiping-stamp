@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-    const apiKey = const apiKey = process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY;;
+    const apiKey = process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY;;
     const baseId = process.env.AIRTABLE_BASE_ID;
     
     // 🚨 終極重點：這裡必須跟你 Airtable 左上角的資料表名稱「一字不差」
