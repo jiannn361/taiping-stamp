@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-    const gasUrl = "https://script.google.com/macros/s/AKfycbz2PDRT9k-Zw6hKpSfK-4aAsrRVtKiXb5tLk_TGkwqfcc7Ks-wQCy1pYyeHviBFX2-c/exec";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbwuGEsA_iNYw_ar7EnYMzHp0eIsW-xVuXTCr8henFl6F7qdZ2JZgFLK_KDKwN4B_HSP/exec";
 
     try {
         // 加上 type=shops 讓試算表知道我們要抓「合作店家」
