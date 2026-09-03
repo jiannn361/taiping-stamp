@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-    const gasUrl = "https://script.google.com/macros/s/AKfycbwMSR-c7x74CeEr5huCcNxDo5BOyIF--VKclPik6EDHheKQEk2BfiuLgVMiF5XZlAZb/exec";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbzaOmUAew5Tyf-045DN98R8bM53vuU_Mh14z6jFPYP5FjlkiT4MFaKg27Ay9avp7TPa/exec";
     
     try {
         // ==================== 讀取點數 (GET) ====================
