@@ -42,7 +42,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         const CloudIcon = ({ className }) => (
             <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -52,9 +52,11 @@
 
         // 🌟 正式上線配置：請清除所有測試資料，並將真實的合作店家 LINE UID 填入此處
         const SHOP_ADMINS = {
-            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S01', name: '太平雲梯測試', category: 'food' },
+            'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '太平雲梯測試', category: '小吃與伴手禮' },
             // 格式範例：
-            // 'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街冬瓜茶', category: 'food' },
+            // 'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街冬瓜茶', category: '小吃與伴手禮' },
+            // 'U22222222222222222222222222222222': { id: 'S02', name: '太平景觀餐廳', category: '餐廳' },
+            // 'U33333333333333333333333333333333': { id: 'S03', name: '太平美好民宿', category: '住宿' },
         };
 
         const Toast = ({ message }) => {
@@ -160,16 +162,16 @@
             const [applyShopCategory, setApplyShopCategory] = useState(''); 
             const [selectedShop, setSelectedShop] = useState(null);
             
-            // 🌟 修改：自訂扣點 (紙本合併) 的狀態，新增 step 追蹤
             const [isCustomRedeem, setIsCustomRedeem] = useState(false);
-            const [customRedeemStep, setCustomRedeemStep] = useState(1); // 1: 密碼, 2: 點數
+            const [customRedeemStep, setCustomRedeemStep] = useState(1);
             const [customPointsInput, setCustomPointsInput] = useState('');
             
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
-            const [listCategory, setListCategory] = useState(null); // 🌟 修改1：將預設值從 'all' 改為 null
+            const [listCategory, setListCategory] = useState(null); 
 
-            const [customerPoints, setCustomerPoints] = useState({ food: 0, souvenir: 0, stay: 0, total: 0 });
+            // 🌟 配合新版 GAS，狀態名稱更新
+            const [customerPoints, setCustomerPoints] = useState({ snack_souvenir: 0, restaurant: 0, stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
             const rawUid = userProfile?.userId || '';
@@ -184,7 +186,8 @@
                         const res = await fetch(`/api/points?uid=${shortUid}`);
                         if (res.ok && isMounted) {
                             const data = await res.json();
-                            if (data.food !== undefined) {
+                            // 🌟 確保新版 GAS 的欄位都有傳過來
+                            if (data.snack_souvenir !== undefined) {
                                 setCustomerPoints(data);
                             }
                         }
@@ -196,32 +199,30 @@
                 return () => { isMounted = false; clearInterval(interval); };
             }, [shortUid]);
 
-           // ✅ 修改後的寫法（強制轉型防崩潰）
-useEffect(() => {
-    let isMounted = true;
-    if (activeTab === 'map' && shopsData.length === 0) {
-        fetch('/api/shops')
-            .then(async res => {
-                const data = await res.json().catch(() => ({})); // 避免 JSON 解析也崩潰
-                if (!res.ok) {
-                    console.error('API 錯誤:', data);
-                    return []; // 如果發生 500 錯誤，強制回傳空陣列
+            useEffect(() => {
+                let isMounted = true;
+                if (activeTab === 'map' && shopsData.length === 0) {
+                    fetch('/api/shops')
+                        .then(async res => {
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                                console.error('API 錯誤:', data);
+                                return []; 
+                            }
+                            return data;
+                        })
+                        .then(data => { 
+                            if (isMounted) setShopsData(Array.isArray(data) ? data : []); 
+                        })
+                        .catch(e => {
+                            console.error('連線錯誤:', e);
+                            if (isMounted) setShopsData([]); 
+                        });
                 }
-                return data;
-            })
-            .then(data => { 
-                // 雙重確認：確定拿到的是真正的陣列 (Array) 才寫入狀態
-                if (isMounted) setShopsData(Array.isArray(data) ? data : []); 
-            })
-            .catch(e => {
-                console.error('連線錯誤:', e);
-                if (isMounted) setShopsData([]); // 發生任何預期外的錯誤，都用空陣列兜底
-            });
-    }
-    return () => { isMounted = false; };
-}, [activeTab]);
+                return () => { isMounted = false; };
+            }, [activeTab]);
 
-            const totalPoints = customerPoints.total || (customerPoints.food + customerPoints.souvenir + customerPoints.stay);
+            const totalPoints = customerPoints.total || (customerPoints.snack_souvenir + customerPoints.restaurant + customerPoints.stay);
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -271,7 +272,8 @@ useEffect(() => {
 
                     let ptsToDeduct = redeemModal.cost;
                     let newPoints = { ...customerPoints };
-                    for (let cat of ['food', 'souvenir', 'stay']) {
+                    // 🌟 依照新版順序扣除
+                    for (let cat of ['snack_souvenir', 'restaurant', 'stay']) {
                         if (ptsToDeduct <= 0) break;
                         if (newPoints[cat] >= ptsToDeduct) { newPoints[cat] -= ptsToDeduct; ptsToDeduct = 0; }
                         else { ptsToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
@@ -286,16 +288,14 @@ useEffect(() => {
                 }
             };
 
-            // 🌟 新增：處理自訂扣點「下一步 (驗證密碼)」的邏輯
             const handleCustomRedeemNextStep = () => {
                 if (staffPassword !== '1688') {
                     showToast('❌ 工作人員密碼錯誤！');
                     return;
                 }
-                setCustomRedeemStep(2); // 密碼正確，進入填寫點數階段
+                setCustomRedeemStep(2); 
             };
 
-            // 🌟 處理自訂扣點「最終確認扣除」的邏輯
             const confirmCustomRedeem = async () => {
                 const ptsToDeductInt = parseInt(customPointsInput, 10);
                 if (isNaN(ptsToDeductInt) || ptsToDeductInt <= 0) {
@@ -308,7 +308,7 @@ useEffect(() => {
                 }
                 
                 showToast('⏳ 系統處理中...');
-                const serialNumber = `M-${Math.floor(100000 + Math.random() * 900000)}`; // M 代表 Merge
+                const serialNumber = `M-${Math.floor(100000 + Math.random() * 900000)}`; 
 
                 try {
                     const res = await fetch('/api/points', {
@@ -321,7 +321,7 @@ useEffect(() => {
                             points: ptsToDeductInt,
                             giftName: `【紙本合併兌換】`,
                             sn: serialNumber,
-                            staffPassword: staffPassword // 沿用第一步驗證過的密碼送出
+                            staffPassword: staffPassword 
                         })
                     });
 
@@ -337,7 +337,8 @@ useEffect(() => {
 
                     let remainingToDeduct = ptsToDeductInt;
                     let newPoints = { ...customerPoints };
-                    for (let cat of ['food', 'souvenir', 'stay']) {
+                    // 🌟 依照新版順序扣除
+                    for (let cat of ['snack_souvenir', 'restaurant', 'stay']) {
                         if (remainingToDeduct <= 0) break;
                         if (newPoints[cat] >= remainingToDeduct) { newPoints[cat] -= remainingToDeduct; remainingToDeduct = 0; }
                         else { remainingToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
@@ -345,7 +346,6 @@ useEffect(() => {
                     newPoints.total -= ptsToDeductInt;
                     setCustomerPoints(newPoints);
 
-                    // 扣除完畢，重置所有狀態
                     setIsCustomRedeem(false);
                     setCustomRedeemStep(1);
                     setCustomPointsInput('');
@@ -355,16 +355,15 @@ useEffect(() => {
                 }
             };
 
-            const processedShops = React.useMemo(() => {
+            const processedShops = useMemo(() => {
                 if (!Array.isArray(shopsData)) return [];
-                
-                // 🌟 修改2：如果還沒有選擇任何分類，就直接回傳空陣列
                 if (!listCategory) return []; 
                 
                 let filtered = shopsData.filter(shop => {
                     const cat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
-                    if (listCategory === 'food') return cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳') || cat.includes('美食');
-                    if (listCategory === 'souvenir') return cat.includes('伴手禮') || cat.includes('gift') || cat.includes('紀念');
+                    // 🌟 依照新版類別過濾
+                    if (listCategory === 'snack_souvenir') return cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift');
+                    if (listCategory === 'restaurant') return cat.includes('餐廳') || cat.includes('restaurant');
                     if (listCategory === 'stay') return cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿');
                     return false;
                 });
@@ -379,8 +378,9 @@ useEffect(() => {
 
             const renderStickers = () => {
                 let stickers = [];
-                for(let i=0; i<customerPoints.food; i++) stickers.push('text-[#FAD564]');
-                for(let i=0; i<customerPoints.souvenir; i++) stickers.push('text-[#FF9E79]');
+                // 🌟 更新貼紙顏色對應：小吃/伴手禮黃色, 餐廳橘色, 住宿綠色
+                for(let i=0; i<customerPoints.snack_souvenir; i++) stickers.push('text-[#FAD564]');
+                for(let i=0; i<customerPoints.restaurant; i++) stickers.push('text-[#FF9E79]');
                 for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
 
                 const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
@@ -430,9 +430,9 @@ useEffect(() => {
                             <div className="grid grid-cols-5 gap-y-4 gap-x-2 justify-items-center">
                                 {renderStickers()}
                             </div>
-                            <div className="mt-5 flex justify-center space-x-3 text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FF9E79] mr-1 border border-white/50 shadow-sm"></span>伴手禮</span>
+                            <div className="mt-5 flex justify-center space-x-3 text-[10px] sm:text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃/伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FF9E79] mr-1 border border-white/50 shadow-sm"></span>餐廳</span>
                                 <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
                             </div>
                         </div>
@@ -499,7 +499,12 @@ useEffect(() => {
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-sm text-slate-600 space-y-2">
                                 <h3 className="font-bold text-slate-700 mb-3 flex items-center"><span className="text-teal-500 mr-2">✦</span> 活動辦法</h3>
                                 <p className="text-teal-700 font-extrabold bg-teal-50 inline-block px-2 py-1 rounded">1. 活動期間：115/10/09 - 10/11</p>
-                                <p>2. 於合作店家消費滿$200元即可獲得一點。</p>
+                                <p>2. 單筆消費依類別計算贈點：</p>
+                                <ul className="list-disc pl-5 font-bold text-teal-800">
+                                    <li>小吃與伴手禮：滿 $200 贈 1 點</li>
+                                    <li>餐廳：滿 $500 贈 1 點</li>
+                                    <li>住宿：滿 $1,000 贈 1 點</li>
+                                </ul>
                                 <p>3. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
                                 <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
                                 <p>5. 贈品數量有限，換完為止。</p>
@@ -547,20 +552,19 @@ useEffect(() => {
                                 <div className="space-y-4 animate-fade-in pb-10">
                                     <div className="grid grid-cols-3 gap-3">
                                         {[
-                                            { id: 'food', name: '小吃', icon: '🍔', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
-                                            { id: 'souvenir', name: '伴手禮', icon: '🎁', bg: 'bg-[#FF9E79]', text: 'text-lime-900' },
+                                            { id: 'snack_souvenir', name: '小吃/伴手禮', icon: '🎁', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
+                                            { id: 'restaurant', name: '餐廳', icon: '🍽️', bg: 'bg-[#FF9E79]', text: 'text-orange-900' },
                                             { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' }
                                          ].map(cat => {
                                             const isActive = listCategory === cat.id;
                                             return (
                                                 <button 
                                                     key={cat.id} 
-                                                    // 🌟 修改3：點擊切換時，如果已經是啟用狀態就設為 null (取消選擇)
                                                     onClick={() => setListCategory(isActive ? null : cat.id)}
                                                     className={`py-4 rounded-2xl flex flex-col items-center justify-center transition-all ${isActive ? `${cat.bg} shadow-md scale-105 ring-2 ring-white` : 'bg-slate-100 opacity-60 hover:opacity-100'}`}
                                                 >
                                                     <span className="text-2xl mb-1">{cat.icon}</span>
-                                                    <span className={`text-sm font-bold ${isActive ? cat.text : 'text-slate-500'}`}>{cat.name}</span>
+                                                    <span className={`text-xs font-bold ${isActive ? cat.text : 'text-slate-500'}`}>{cat.name}</span>
                                                 </button>
                                             )
                                         })}
@@ -570,7 +574,6 @@ useEffect(() => {
                                         {shopsData.length === 0 ? (
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm">載入店家名單中...</div>
                                         ) : !listCategory ? (
-                                            // 🌟 修改4：加入提示文字，告訴使用者要先點擊上方分類
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm flex flex-col items-center">
                                                 <span className="text-3xl mb-3 animate-bounce">👆</span>
                                                 <span>請點選上方類別查看合作店家</span>
@@ -581,8 +584,8 @@ useEffect(() => {
                                             processedShops.map(shop => {
                                                 const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
                                                 let icon = '📍';
-                                                if (catStr.includes('小吃') || catStr.includes('food') || catStr.includes('餐廳')) icon = '🍔';
-                                                else if (catStr.includes('伴手禮') || catStr.includes('gift')) icon = '🎁';
+                                                if (catStr.includes('餐廳') || catStr.includes('restaurant')) icon = '🍽️';
+                                                else if (catStr.includes('小吃') || catStr.includes('伴手禮') || catStr.includes('food') || catStr.includes('gift')) icon = '🎁';
                                                 else if (catStr.includes('住宿') || catStr.includes('stay')) icon = '🏠';
 
                                                 return (
@@ -643,7 +646,6 @@ useEffect(() => {
                         </div>
                     )}
 
-                    {/* 🌟 兩段式的自訂扣點彈出視窗 */}
                     {isCustomRedeem && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slide-up relative z-50">
@@ -655,7 +657,6 @@ useEffect(() => {
                                 <div className="p-6 text-center transition-all">
                                     
                                     {customRedeemStep === 1 ? (
-                                        // 第一階段：輸入密碼
                                         <div className="animate-fade-in">
                                             <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">請先驗證身分</p>
                                             <input 
@@ -668,7 +669,6 @@ useEffect(() => {
                                             <button onClick={handleCustomRedeemNextStep} className="w-full py-4 rounded-xl bg-slate-800 text-white font-bold shadow-md hover:bg-slate-900 transition-colors text-lg active:scale-95">下一步</button>
                                         </div>
                                     ) : (
-                                        // 第二階段：輸入欲扣除點數
                                         <div className="animate-fade-in">
                                             <div className="flex justify-center mb-2">
                                                 <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">✅ 密碼驗證通過</span>
@@ -715,11 +715,11 @@ useEffect(() => {
                                     <div className="text-left mb-5">
                                         <label className="text-xs font-bold text-slate-500 ml-1 mb-2 block">您的主要發送點數類別 <span className="text-teal-500">*必選</span></label>
                                         <div className="grid grid-cols-3 gap-2">
-                                            {['小吃/餐廳', '伴手禮', '住宿'].map(cat => (
+                                            {['小吃與伴手禮', '餐廳', '住宿'].map(cat => (
                                                 <button 
                                                     key={cat}
                                                     onClick={() => setApplyShopCategory(cat)}
-                                                    className={`py-2 rounded-xl text-sm font-bold border-2 transition-all ${applyShopCategory === cat ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                                                    className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${applyShopCategory === cat ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
                                                 >
                                                     {cat}
                                                 </button>
@@ -784,7 +784,7 @@ useEffect(() => {
                                     )}
                                     
                                     <div className="flex gap-3">
-                                        <a href={selectedShop.nav_link || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
+                                        <a href={selectedShop.mapUrl || `https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`} target="_blank" rel="noopener noreferrer" 
                                            className="flex-1 flex items-center justify-center gap-2 bg-[#0f766e] text-white text-base font-bold py-3.5 rounded-2xl shadow-sm hover:bg-[#115e59] transition-colors active:scale-95">
                                             🗺️ 導航
                                         </a>
@@ -805,29 +805,27 @@ useEffect(() => {
 
         function MapComponent({ onMarkerClick, activeTab, shops }) {
             const mapRef = useRef(null);
-            const containerRef = useRef(null); // 🌟 新增：使用 React 的 ref 來綁定 DOM，取代傳統的 ID
+            const containerRef = useRef(null); 
             
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
-                if (cat.includes('accommodation') || cat.includes('民宿') || cat.includes('住宿') || cat.includes('stay')) return '🏠';
-                if (cat.includes('food') || cat.includes('美食') || cat.includes('小吃') || cat.includes('餐廳')) return '🍔';
-                if (cat.includes('gift') || cat.includes('伴手禮') || cat.includes('商店') || cat.includes('souvenir')) return '🎁';
+                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '🏠';
+                if (cat.includes('餐廳') || cat.includes('restaurant')) return '🍽️';
+                if (cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift')) return '🎁';
                 return '📍';
             };
 
             const getCategoryColor = (category) => {
                 const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('小吃') || cat.includes('food') || cat.includes('餐廳')) return '#FAD564';
-                if (cat.includes('伴手禮') || cat.includes('gift')) return '#FF9E79';
+                if (cat.includes('餐廳') || cat.includes('restaurant')) return '#FF9E79';
+                if (cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift')) return '#FAD564';
                 if (cat.includes('住宿') || cat.includes('stay')) return '#8EBD9D';
                 return '#1f2937'; 
             };
 
-            // 🌟 修復 1：獨立的地圖「初始化與銷毀」區塊
             useEffect(() => {
                 if (containerRef.current && !mapRef.current) {
-                    // 初始化地圖
                     const map = L.map(containerRef.current, { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
                     L.control.zoom({ position: 'bottomright' }).addTo(map);
                     
@@ -840,20 +838,17 @@ useEffect(() => {
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
                 }
 
-                // 🌟 關鍵修復：當離開這個分頁時，徹底銷毀地圖實體，避免 "already initialized" 衝突
                 return () => {
                     if (mapRef.current) {
                         mapRef.current.remove();
                         mapRef.current = null;
                     }
                 };
-            }, []); // 只有在組件載入和卸載時執行
+            }, []); 
 
-            // 🌟 修復 2：獨立的「繪製大頭針」區塊
             useEffect(() => {
                 if (mapRef.current && shops && shops.length > 0) {
                     const map = mapRef.current;
-                    // 清除舊的大頭針
                     map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
                     
                     const bounds = [];
@@ -875,7 +870,7 @@ useEffect(() => {
                     });
                     if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
                 }
-            }, [shops, onMarkerClick]); // 當店家資料改變時才重新畫
+            }, [shops, onMarkerClick]); 
 
             return <div ref={containerRef} className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>;
         }
@@ -893,9 +888,25 @@ useEffect(() => {
             const [isQuerying, setIsQuerying] = useState(false);
             const [recentRecords, setRecentRecords] = useState([]);
             const [cooldowns, setCooldowns] = useState({});
+            
+            // 🌟 1. 讓店家可以手動選擇他現在是用哪個身份發點 (以防他是複合式經營)
+            const [currentCategory, setCurrentCategory] = useState(activeShop.category || '小吃與伴手禮');
 
             const parsedAmount = parseInt(amount, 10) || 0;
-            const calculatedPoints = Math.floor(parsedAmount / 200);
+            
+            // 🌟 2. 自動判斷門檻計算點數
+            const calculatedPoints = useMemo(() => {
+                if (currentCategory === '住宿') return Math.floor(parsedAmount / 1000);
+                if (currentCategory === '餐廳') return Math.floor(parsedAmount / 500);
+                return Math.floor(parsedAmount / 200); // 預設：小吃與伴手禮
+            }, [parsedAmount, currentCategory]);
+            
+            // 取得門檻提示文字
+            const thresholdText = useMemo(() => {
+                if (currentCategory === '住宿') return '$1000/點';
+                if (currentCategory === '餐廳') return '$500/點';
+                return '$200/點';
+            }, [currentCategory]);
 
             useEffect(() => {
                 if (scanStatus === 'idle') setManualCode('');
@@ -976,13 +987,12 @@ useEffect(() => {
                     const payload = {
                         uid: scannedUid,
                         action: 'add',
-                        category: activeShop.category,
+                        category: currentCategory, // 🌟 傳送最新的三級制分類給後端
                         points: calculatedPoints,
                         shopUid: userProfile?.userId,
                         shopName: activeShop.name
                     };
                     
-                    // 🌟 重點修正：確保抓取真實名字傳送給 Airtable
                     if (scannedName && scannedName !== '手動輸入新遊客' && scannedName !== '無網路(手動鎖定)' && scannedName !== '未知遊客' && scannedName !== '新遊客') {
                         payload.userName = scannedName;
                     }
@@ -1040,6 +1050,22 @@ useEffect(() => {
                         <div className="text-center mb-6">
                             <h2 className="font-bold text-xl text-slate-800">{activeShop.name}</h2>
                             <span className="text-xs text-slate-400">發點專員介面</span>
+                        </div>
+                        
+                        {/* 🌟 3. 店家可隨時切換本次發送的類別 (針對複合式經營) */}
+                        <div className="mb-5 flex flex-col items-center">
+                             <label className="text-[11px] font-bold text-slate-400 mb-1.5">目前套用的發送門檻</label>
+                             <div className="bg-slate-100 p-1 rounded-xl shadow-inner inline-flex w-full">
+                                {['小吃與伴手禮', '餐廳', '住宿'].map(cat => (
+                                    <button 
+                                        key={cat}
+                                        onClick={() => setCurrentCategory(cat)}
+                                        className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all whitespace-nowrap px-1 ${currentCategory === cat ? 'bg-white text-teal-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                             </div>
                         </div>
                         
                         {scanStatus === 'idle' && (
@@ -1152,9 +1178,13 @@ useEffect(() => {
                                     </div>
                                 </div>
                                 
-                                <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center font-bold border border-teal-100 shadow-sm">
-                                    <span className="text-teal-800">換算發送點數</span>
-                                    <span className="text-4xl text-teal-600">{calculatedPoints} <span className="text-lg">點</span></span>
+                                <div className="bg-teal-50 p-4 rounded-2xl flex justify-between items-center font-bold border border-teal-100 shadow-sm relative overflow-hidden">
+                                    {/* 🌟 4. 顯示門檻提示給店家看，避免糾紛 */}
+                                    <div className="absolute top-0 right-0 bg-teal-600 text-white text-[9px] px-2 py-0.5 rounded-bl-lg font-normal">
+                                        {currentCategory}門檻：{thresholdText}
+                                    </div>
+                                    <span className="text-teal-800 mt-1">換算發送點數</span>
+                                    <span className="text-4xl text-teal-600 mt-1">{calculatedPoints} <span className="text-lg">點</span></span>
                                 </div>
                                 
                                 <div className="flex space-x-3 pt-2">
