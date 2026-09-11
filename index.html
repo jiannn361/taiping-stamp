@@ -50,9 +50,10 @@
             </svg>
         );
 
-        // 🌟 正式上線配置：請清除所有測試資料，並將真實的合作店家 LINE UID 填入此處
+        // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
             'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '太平雲梯測試', category: '餐廳' },
+            'Ucf69096d6b2cbf209d63a7427491b24c': { id: 'S01', name: '太平雲梯測試', category: '小吃與伴手禮' },
             // 格式範例：
             // 'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街冬瓜茶', category: '小吃與伴手禮' },
             // 'U22222222222222222222222222222222': { id: 'S02', name: '太平景觀餐廳', category: '餐廳' },
@@ -159,7 +160,6 @@
             const [staffPassword, setStaffPassword] = useState('');
             const [showBindingModal, setShowBindingModal] = useState(false);
             const [applyShopName, setApplyShopName] = useState('');
-            const [applyShopCategory, setApplyShopCategory] = useState(''); 
             const [selectedShop, setSelectedShop] = useState(null);
             
             const [isCustomRedeem, setIsCustomRedeem] = useState(false);
@@ -703,28 +703,13 @@
                                     <h3 className="font-bold text-lg tracking-wider">店家權限開通申請</h3>
                                 </div>
                                 <div className="p-6 text-center">
-                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕將這串專屬代碼傳送給我們！</p>
+                                    <p className="text-sm text-slate-600 mb-4 text-left leading-relaxed">請告訴我們您的店名，然後點擊下方按鈕將這串專屬代碼傳送給我們；發點類別將由大會審核後設定。</p>
                                     <div className="text-left mb-4">
                                         <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">您的真實店名 <span className="text-rose-500">*必填</span></label>
                                         <input 
                                             type="text" placeholder="例如：太平雲梯服務中心" value={applyShopName} onChange={(e) => setApplyShopName(e.target.value)}
                                             className={`w-full bg-slate-50 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-colors ${applyShopName.trim() === '' ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-teal-400'}`}
                                         />
-                                    </div>
-
-                                    <div className="text-left mb-5">
-                                        <label className="text-xs font-bold text-slate-500 ml-1 mb-2 block">您的主要發送點數類別 <span className="text-teal-500">*必選</span></label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {['小吃與伴手禮', '餐廳', '住宿'].map(cat => (
-                                                <button 
-                                                    key={cat}
-                                                    onClick={() => setApplyShopCategory(cat)}
-                                                    className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${applyShopCategory === cat ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                                                >
-                                                    {cat}
-                                                </button>
-                                            ))}
-                                        </div>
                                     </div>
 
                                     <div className="bg-slate-100 p-3 rounded-xl font-mono text-[10px] text-slate-500 break-all mb-6 font-bold border-2 border-slate-200 text-left">
@@ -734,8 +719,7 @@
                                     <div className="flex flex-col space-y-3">
                                         <button onClick={() => {
                                             if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
-                                            if(!applyShopCategory) { showToast('❌ 請選擇您的主要發送點數類別'); return;}
-                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A主要類別：${applyShopCategory}%0A我的代碼是：${userProfile?.userId}`, '_blank');
+                                            window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的代碼是：${userProfile?.userId}`, '_blank');
                                         }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
@@ -889,8 +873,8 @@
             const [recentRecords, setRecentRecords] = useState([]);
             const [cooldowns, setCooldowns] = useState({});
             
-            // 🌟 1. 讓店家可以手動選擇他現在是用哪個身份發點 (以防他是複合式經營)
-            const [currentCategory, setCurrentCategory] = useState(activeShop.category || '小吃與伴手禮');
+            // 發點分類由大會依店家 UID 設定，店家端不可切換。
+            const currentCategory = activeShop.category || '小吃與伴手禮';
 
             const parsedAmount = parseInt(amount, 10) || 0;
             
@@ -987,7 +971,8 @@
                     const payload = {
                         uid: scannedUid,
                         action: 'add',
-                        category: currentCategory, // 🌟 傳送最新的三級制分類給後端
+                        // 分類由此 UID 的固定設定帶入，店家介面不提供切換。
+                        category: currentCategory,
                         points: calculatedPoints,
                         shopUid: userProfile?.userId,
                         shopName: activeShop.name
@@ -1052,19 +1037,10 @@
                             <span className="text-xs text-slate-400">發點專員介面</span>
                         </div>
                         
-                        {/* 🌟 3. 店家可隨時切換本次發送的類別 (針對複合式經營) */}
                         <div className="mb-5 flex flex-col items-center">
-                             <label className="text-[11px] font-bold text-slate-400 mb-1.5">目前套用的發送門檻</label>
-                             <div className="bg-slate-100 p-1 rounded-xl shadow-inner inline-flex w-full">
-                                {['小吃與伴手禮', '餐廳', '住宿'].map(cat => (
-                                    <button 
-                                        key={cat}
-                                        onClick={() => setCurrentCategory(cat)}
-                                        className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all whitespace-nowrap px-1 ${currentCategory === cat ? 'bg-white text-teal-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
+                             <label className="text-[11px] font-bold text-slate-400 mb-1.5">大會設定的發送門檻</label>
+                             <div className="w-full rounded-xl border border-teal-100 bg-teal-50 px-4 py-2.5 text-center text-sm font-bold text-teal-700">
+                                {currentCategory}（{thresholdText}）
                              </div>
                         </div>
                         
