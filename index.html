@@ -53,7 +53,7 @@
         // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
             'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '太平雲梯測試', category: '餐廳' },
-            'Ucf69096d6b2cbf209d63a7427491b24c': { id: 'S01', name: '太平雲梯測試', category: '小吃與伴手禮' },
+            'Ucf69096d6b2cbf209d63a7427491b24a': { id: 'S01', name: '太平雲梯測試', category: 'food' },
             // 格式範例：
             // 'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街冬瓜茶', category: '小吃與伴手禮' },
             // 'U22222222222222222222222222222222': { id: 'S02', name: '太平景觀餐廳', category: '餐廳' },
@@ -720,7 +720,7 @@
                                         <button onClick={() => {
                                             if(!applyShopName) { showToast('❌ 請輸入店名'); return;}
                                             window.open(`https://line.me/R/msg/text/?你好，我要綁定店家系統！%0A我的店名是：${applyShopName}%0A我的代碼是：${userProfile?.userId}`, '_blank');
-                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 給大會</button>
+                                        }} className="w-full py-3 rounded-xl bg-green-500 text-white font-bold shadow-md hover:bg-green-600 block text-center transition-colors">一鍵傳送 LINE 至商圈群組</button>
                                         <button onClick={() => setShowBindingModal(false)} className="w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">取消返回</button>
                                     </div>
                                 </div>
