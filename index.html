@@ -60,8 +60,9 @@
 
         const getCategoryPoints = (points, category) => {
             if (category === 'snack_souvenir') return points.snack_souvenir || 0;
-            // 同時相容既有資料（restaurant、stay 分開儲存）與未來合併欄位。
-            return Math.max(points.restaurant_stay || 0, (points.restaurant || 0) + (points.stay || 0));
+            // 合併類別的既有 API 可能把同一個數字回傳到 restaurant 與 stay，不能相加。
+            // 優先使用未來的合併欄位；沒有時取兩個舊欄位中較大的有效值。
+            return Math.max(points.restaurant_stay || 0, points.restaurant || 0, points.stay || 0);
         };
 
         const SHOW_REDEMPTION = false;
