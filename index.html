@@ -50,6 +50,24 @@
             </svg>
         );
 
+        // 店家資料可能使用中文或英文分類；餐廳與住宿在前端視為同一集點類別。
+        const getShopCategory = (category) => {
+            const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
+            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('gift')) return 'snack_souvenir';
+            if (value.includes('餐廳') || value.includes('住宿') || value.includes('民宿') || value.includes('restaurant') || value.includes('stay')) return 'restaurant_stay';
+            return 'snack_souvenir';
+        };
+
+        const getCategoryPoints = (points, category) => {
+            if (category === 'snack_souvenir') return points.snack_souvenir || 0;
+            // 同時相容既有資料（restaurant、stay 分開儲存）與未來合併欄位。
+            return points.restaurant_stay !== undefined
+                ? points.restaurant_stay || 0
+                : (points.restaurant || 0) + (points.stay || 0);
+        };
+
+        const SHOW_REDEMPTION = false;
+
         // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
             'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '太平雲梯測試', category: '餐廳' },
@@ -171,7 +189,7 @@
             const [listCategory, setListCategory] = useState(null); 
 
             // 🌟 配合新版 GAS，狀態名稱更新
-            const [customerPoints, setCustomerPoints] = useState({ snack_souvenir: 0, restaurant: 0, stay: 0, total: 0 });
+            const [customerPoints, setCustomerPoints] = useState({ snack_souvenir: 0, restaurant: 0, stay: 0, restaurant_stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
             const rawUid = userProfile?.userId || '';
@@ -222,7 +240,7 @@
                 return () => { isMounted = false; };
             }, [activeTab]);
 
-            const totalPoints = customerPoints.total || (customerPoints.snack_souvenir + customerPoints.restaurant + customerPoints.stay);
+            const totalPoints = customerPoints.total ?? (getCategoryPoints(customerPoints, 'snack_souvenir') + getCategoryPoints(customerPoints, 'restaurant_stay'));
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -362,10 +380,7 @@
                 let filtered = shopsData.filter(shop => {
                     const cat = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
                     // 🌟 依照新版類別過濾
-                    if (listCategory === 'snack_souvenir') return cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift');
-                    if (listCategory === 'restaurant') return cat.includes('餐廳') || cat.includes('restaurant');
-                    if (listCategory === 'stay') return cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿');
-                    return false;
+                    return getShopCategory(cat) === listCategory;
                 });
                 
                 const shuffled = [...filtered];
@@ -378,10 +393,8 @@
 
             const renderStickers = () => {
                 let stickers = [];
-                // 🌟 更新貼紙顏色對應：小吃/伴手禮黃色, 餐廳橘色, 住宿綠色
-                for(let i=0; i<customerPoints.snack_souvenir; i++) stickers.push('text-[#FAD564]');
-                for(let i=0; i<customerPoints.restaurant; i++) stickers.push('text-[#FF9E79]');
-                for(let i=0; i<customerPoints.stay; i++) stickers.push('text-[#8EBD9D]');
+                for(let i=0; i<getCategoryPoints(customerPoints, 'snack_souvenir'); i++) stickers.push('text-[#258398]');
+                for(let i=0; i<getCategoryPoints(customerPoints, 'restaurant_stay'); i++) stickers.push('text-[#e7a810]');
 
                 const totalSlots = Math.max(10, Math.ceil(stickers.length / 10) * 10);
                 const slots = [];
@@ -431,9 +444,8 @@
                                 {renderStickers()}
                             </div>
                             <div className="mt-5 flex justify-center space-x-3 text-[10px] sm:text-xs text-teal-900 font-bold bg-white/50 py-2 rounded-full">
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FAD564] mr-1 border border-white/50 shadow-sm"></span>小吃/伴手禮</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#FF9E79] mr-1 border border-white/50 shadow-sm"></span>餐廳</span>
-                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#8EBD9D] mr-1 border border-white/50 shadow-sm"></span>住宿</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#258398] mr-1 border border-white/50 shadow-sm"></span>小吃/伴手禮</span>
+                                <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#e7a810] mr-1 border border-white/50 shadow-sm"></span>餐廳/住宿</span>
                             </div>
                         </div>
                     </div>
@@ -457,13 +469,13 @@
                     </div>
 
                     <div className="flex justify-center space-x-4 mt-4 mb-4 px-2 border-b border-teal-100">
-                        <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>
+                        {SHOW_REDEMPTION && <button onClick={() => setActiveTab('card')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'card' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>獎項兌換</button>}
                         <button onClick={() => setActiveTab('rules')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'rules' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>紀錄與規則</button>
                         <button onClick={() => setActiveTab('map')} className={`pb-2 font-bold text-sm transition-colors px-2 ${activeTab === 'map' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-slate-400'}`}>合作店家</button>
                     </div>
 
                     {}
-                    {activeTab === 'card' && (
+                    {SHOW_REDEMPTION && activeTab === 'card' && (
                         <div className="px-5 space-y-4 animate-fade-in">
                             {redeemGifts.map(gift => {
                                 const canRedeem = totalPoints >= gift.cost;
@@ -502,15 +514,16 @@
                                 <p>2. 單筆消費依類別計算贈點：</p>
                                 <ul className="list-disc pl-5 font-bold text-teal-800">
                                     <li>小吃與伴手禮：滿 $200 贈 1 點</li>
-                                    <li>餐廳：滿 $500 贈 1 點</li>
-                                    <li>住宿：滿 $1,000 贈 1 點</li>
+                                    <li>餐廳與住宿：滿 $400 贈 1 點</li>
                                 </ul>
-                                <p>3. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
-                                <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
-                                <p>5. 贈品數量有限，換完為止。</p>
+                                {SHOW_REDEMPTION && <>
+                                    <p>3. 點數充足時，可至商圈服務台出示手機畫面進行兌換。</p>
+                                    <p className="text-rose-500 font-bold">4. 兌換操作需由服務台工作人員輸入密碼，請勿自行操作，若因誤觸導致點數扣除，恕不補發。</p>
+                                    <p>5. 贈品數量有限，換完為止。</p>
+                                </>}
                             </div>
 
-                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                            {SHOW_REDEMPTION && <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                                 <h3 className="font-bold text-slate-700 mb-4 flex items-center"><span className="text-teal-500 mr-2">✦</span> 我的兌換紀錄 (本次登入)</h3>
                                 {redeemHistory.length === 0 ? (
                                     <p className="text-center text-slate-400 text-sm py-4">尚無兌換紀錄</p>
@@ -532,7 +545,7 @@
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </div>}
                         </div>
                     )}
 
@@ -550,11 +563,10 @@
                                 </div>
                             ) : (
                                 <div className="space-y-4 animate-fade-in pb-10">
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-2 gap-3">
                                         {[
-                                            { id: 'snack_souvenir', name: '小吃/伴手禮', icon: '🎁', bg: 'bg-[#FAD564]', text: 'text-amber-900' },
-                                            { id: 'restaurant', name: '餐廳', icon: '🍽️', bg: 'bg-[#FF9E79]', text: 'text-orange-900' },
-                                            { id: 'stay', name: '住宿', icon: '🏠', bg: 'bg-[#8EBD9D]', text: 'text-emerald-900' }
+                                            { id: 'snack_souvenir', name: '小吃/伴手禮', icon: '🎁', bg: 'bg-[#258398]', text: 'text-white' },
+                                            { id: 'restaurant_stay', name: '餐廳/住宿', icon: '🍽️🏠', bg: 'bg-[#e7a810]', text: 'text-amber-950' }
                                          ].map(cat => {
                                             const isActive = listCategory === cat.id;
                                             return (
@@ -584,9 +596,9 @@
                                             processedShops.map(shop => {
                                                 const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
                                                 let icon = '📍';
-                                                if (catStr.includes('餐廳') || catStr.includes('restaurant')) icon = '🍽️';
-                                                else if (catStr.includes('小吃') || catStr.includes('伴手禮') || catStr.includes('food') || catStr.includes('gift')) icon = '🎁';
-                                                else if (catStr.includes('住宿') || catStr.includes('stay')) icon = '🏠';
+                                                if (getShopCategory(catStr) === 'snack_souvenir') icon = '🎁';
+                                                else if (catStr.includes('住宿') || catStr.includes('stay') || catStr.includes('民宿')) icon = '🏠';
+                                                else if (getShopCategory(catStr) === 'restaurant_stay') icon = '🍽️';
 
                                                 return (
                                                     <div key={shop.id} onClick={() => setSelectedShop(shop)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between cursor-pointer hover:border-teal-300 transition-colors active:scale-95">
@@ -794,17 +806,15 @@
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
                 const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
+                if (getShopCategory(cat) === 'snack_souvenir') return '🎁';
                 if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '🏠';
-                if (cat.includes('餐廳') || cat.includes('restaurant')) return '🍽️';
-                if (cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift')) return '🎁';
+                if (getShopCategory(cat) === 'restaurant_stay') return '🍽️';
                 return '📍';
             };
 
             const getCategoryColor = (category) => {
-                const cat = Array.isArray(category) ? category.join(',').toLowerCase() : (category || '').toLowerCase();
-                if (cat.includes('餐廳') || cat.includes('restaurant')) return '#FF9E79';
-                if (cat.includes('小吃') || cat.includes('伴手禮') || cat.includes('food') || cat.includes('gift')) return '#FAD564';
-                if (cat.includes('住宿') || cat.includes('stay')) return '#8EBD9D';
+                if (getShopCategory(category) === 'snack_souvenir') return '#258398';
+                if (getShopCategory(category) === 'restaurant_stay') return '#e7a810';
                 return '#1f2937'; 
             };
 
@@ -875,22 +885,19 @@
             
             // 發點分類由大會依店家 UID 設定，店家端不可切換。
             const currentCategory = activeShop.category || '小吃與伴手禮';
+            const pointCategory = getShopCategory(currentCategory);
 
             const parsedAmount = parseInt(amount, 10) || 0;
             
-            // 🌟 2. 自動判斷門檻計算點數
+            // 小吃/伴手禮為 $200；餐廳/住宿為 $400。
             const calculatedPoints = useMemo(() => {
-                if (currentCategory === '住宿') return Math.floor(parsedAmount / 1000);
-                if (currentCategory === '餐廳') return Math.floor(parsedAmount / 500);
-                return Math.floor(parsedAmount / 200); // 預設：小吃與伴手禮
-            }, [parsedAmount, currentCategory]);
+                return Math.floor(parsedAmount / (pointCategory === 'restaurant_stay' ? 400 : 200));
+            }, [parsedAmount, pointCategory]);
             
             // 取得門檻提示文字
             const thresholdText = useMemo(() => {
-                if (currentCategory === '住宿') return '$1000/點';
-                if (currentCategory === '餐廳') return '$500/點';
-                return '$200/點';
-            }, [currentCategory]);
+                return pointCategory === 'restaurant_stay' ? '$400/點' : '$200/點';
+            }, [pointCategory]);
 
             useEffect(() => {
                 if (scanStatus === 'idle') setManualCode('');
@@ -972,6 +979,7 @@
                         uid: scannedUid,
                         action: 'add',
                         // 分類由此 UID 的固定設定帶入，店家介面不提供切換。
+                        // 保留店家原始分類值，維持既有後端資料欄位相容性；前端以 pointCategory 套用合併規則。
                         category: currentCategory,
                         points: calculatedPoints,
                         shopUid: userProfile?.userId,
@@ -1040,7 +1048,7 @@
                         <div className="mb-5 flex flex-col items-center">
                              <label className="text-[11px] font-bold text-slate-400 mb-1.5">大會設定的發送門檻</label>
                              <div className="w-full rounded-xl border border-teal-100 bg-teal-50 px-4 py-2.5 text-center text-sm font-bold text-teal-700">
-                                {currentCategory}（{thresholdText}）
+                                {pointCategory === 'restaurant_stay' ? '餐廳/住宿' : '小吃/伴手禮'}（{thresholdText}）
                              </div>
                         </div>
                         
