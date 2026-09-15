@@ -61,9 +61,7 @@
         const getCategoryPoints = (points, category) => {
             if (category === 'snack_souvenir') return points.snack_souvenir || 0;
             // 同時相容既有資料（restaurant、stay 分開儲存）與未來合併欄位。
-            return points.restaurant_stay !== undefined
-                ? points.restaurant_stay || 0
-                : (points.restaurant || 0) + (points.stay || 0);
+            return Math.max(points.restaurant_stay || 0, (points.restaurant || 0) + (points.stay || 0));
         };
 
         const SHOW_REDEMPTION = false;
@@ -189,7 +187,7 @@
             const [listCategory, setListCategory] = useState(null); 
 
             // 🌟 配合新版 GAS，狀態名稱更新
-            const [customerPoints, setCustomerPoints] = useState({ snack_souvenir: 0, restaurant: 0, stay: 0, restaurant_stay: 0, total: 0 });
+            const [customerPoints, setCustomerPoints] = useState({ snack_souvenir: 0, restaurant: 0, stay: 0, total: 0 });
             const [redeemHistory, setRedeemHistory] = useState([]); 
 
             const rawUid = userProfile?.userId || '';
@@ -240,7 +238,9 @@
                 return () => { isMounted = false; };
             }, [activeTab]);
 
-            const totalPoints = customerPoints.total ?? (getCategoryPoints(customerPoints, 'snack_souvenir') + getCategoryPoints(customerPoints, 'restaurant_stay'));
+            // 部分既有資料的 total 欄位不會同步更新，因此優先以各分類點數加總。
+            const categoryTotal = getCategoryPoints(customerPoints, 'snack_souvenir') + getCategoryPoints(customerPoints, 'restaurant_stay');
+            const totalPoints = categoryTotal > 0 ? categoryTotal : (customerPoints.total || 0);
 
             const redeemGifts = [
                 { id: 1, name: '商圈特色伴手禮', cost: 5 },
@@ -878,8 +878,10 @@
             const [scannedName, setScannedName] = useState('');
             const [amount, setAmount] = useState('');
             const scannerRef = useRef(null);
+            const submissionLockRef = useRef(false);
 
             const [isQuerying, setIsQuerying] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
             const [recentRecords, setRecentRecords] = useState([]);
             const [cooldowns, setCooldowns] = useState({});
             
@@ -971,7 +973,12 @@
             };
 
             const handleSubmit = async () => {
-                if (calculatedPoints <= 0) return;
+                // 用 ref 立即鎖定，避免 React 尚未重新渲染前的連點造成重複發點。
+                if (calculatedPoints <= 0 || submissionLockRef.current) return;
+                submissionLockRef.current = true;
+                setIsSubmitting(true);
+                // 請求逾時時無法確認伺服器是否已完成寫入，先保留冷卻時間以避免重送。
+                setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
                 showToast('⏳ 正在傳送點數...');
 
                 try {
@@ -1014,8 +1021,11 @@
                         setScanStatus('found');
                     }
                 } catch (e) {
-                    showToast(`❌ 網路斷線或異常: ${e.message}`);
+                    showToast('⚠️ 傳送狀態未明，請先確認遊客點數；為避免重複發點，1 分鐘內不可再次送出。');
                     setScanStatus('found');
+                } finally {
+                    submissionLockRef.current = false;
+                    setIsSubmitting(false);
                 }
             };
 
@@ -1192,8 +1202,8 @@
                                 )}
                                 
                                 <div className="flex space-x-3 mt-8">
-                                    <button onClick={() => setScanStatus('found')} className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
-                                    <button onClick={handleSubmit} className={`flex-[2] py-4 rounded-2xl font-bold text-white shadow-lg active:scale-95 text-lg transition-colors ${calculatedPoints >= 10 ? 'bg-rose-500 hover:bg-rose-600' : 'bg-teal-600 hover:bg-teal-700'}`}>確認送出</button>
+                                    <button onClick={() => setScanStatus('found')} disabled={isSubmitting} className="flex-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-colors py-4 rounded-2xl font-bold text-slate-600 active:scale-95">返回修改</button>
+                                    <button onClick={handleSubmit} disabled={isSubmitting} className={`flex-[2] py-4 rounded-2xl font-bold text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-70 transition-colors ${calculatedPoints >= 10 ? 'bg-rose-500 hover:bg-rose-600' : 'bg-teal-600 hover:bg-teal-700'}`}>{isSubmitting ? <span className="flex items-center justify-center gap-2"><span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>傳送中…</span> : '確認送出'}</button>
                                 </div>
                             </div>
                         )}
