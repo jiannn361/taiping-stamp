@@ -60,9 +60,9 @@
 
         const getCategoryPoints = (points, category) => {
             if (category === 'snack_souvenir') return points.snack_souvenir || 0;
-            // 合併類別的既有 API 可能把同一個數字回傳到 restaurant 與 stay，不能相加。
-            // 優先使用未來的合併欄位；沒有時取兩個舊欄位中較大的有效值。
-            return Math.max(points.restaurant_stay || 0, points.restaurant || 0, points.stay || 0);
+            // 新版 Sheet 已將餐廳/住宿合併；舊 API 的 stay 欄位可能實際承載總點數，不能讀取。
+            // 優先使用合併欄位，否則使用 restaurant（新版 Sheet 的餐廳/住宿欄）。
+            return points.restaurant_stay || points.restaurant || 0;
         };
 
         const SHOW_REDEMPTION = false;
