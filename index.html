@@ -902,6 +902,28 @@
                 return pointCategory === 'restaurant_stay' ? '$400/點' : '$200/點';
             }, [pointCategory]);
 
+            const getCooldownKey = (uid) => `taiping-stamp:point-cooldown:${userProfile?.userId || activeShop.id}:${uid}`;
+
+            const getCooldownTimestamp = (uid) => {
+                let storedTimestamp = 0;
+                try {
+                    storedTimestamp = Number(localStorage.getItem(getCooldownKey(uid))) || 0;
+                } catch (e) {
+                    // 無法使用瀏覽器儲存空間時，仍由本次畫面的狀態保護。
+                }
+                return Math.max(cooldowns[uid] || 0, storedTimestamp);
+            };
+
+            const startCooldown = (uid) => {
+                const timestamp = Date.now();
+                setCooldowns(prev => ({ ...prev, [uid]: timestamp }));
+                try {
+                    localStorage.setItem(getCooldownKey(uid), String(timestamp));
+                } catch (e) {
+                    // 儲存空間不可用時不影響本次操作的防連點鎖定。
+                }
+            };
+
             useEffect(() => {
                 if (scanStatus === 'idle') setManualCode('');
             }, [scanStatus]);
@@ -965,7 +987,7 @@
             };
 
             const proceedToConfirm = () => {
-                const lastTime = cooldowns[scannedUid];
+                const lastTime = getCooldownTimestamp(scannedUid);
                 if (lastTime && (Date.now() - lastTime) < 1 * 60 * 1000) {
                     showToast('❌ 錯誤：1 分鐘內已發送過點數，系統啟動防重複保護！');
                     return;
@@ -979,7 +1001,7 @@
                 submissionLockRef.current = true;
                 setIsSubmitting(true);
                 // 請求逾時時無法確認伺服器是否已完成寫入，先保留冷卻時間以避免重送。
-                setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
+                startCooldown(scannedUid);
                 showToast('⏳ 正在傳送點數...');
 
                 try {
@@ -1008,7 +1030,6 @@
                         showToast(`🎉 成功發送 ${calculatedPoints} 點給遊客！`);
                         const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         setRecentRecords(prev => [{ time: timeStr, uid: scannedUid.slice(-8), name: scannedName, points: calculatedPoints }, ...prev].slice(0, 5));
-                        setCooldowns(prev => ({ ...prev, [scannedUid]: Date.now() }));
                         setAmount('');
                         setScanStatus('idle');
                     } else {
