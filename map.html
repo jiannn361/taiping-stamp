@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>太平合作店家地圖</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; color: #1e293b; }
+        #map { height: 100dvh; width: 100vw; background: #f1f5f9; }
+        .map-header { position: fixed; z-index: 1000; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
+        .map-title, .map-back { pointer-events: auto; background: rgba(255,255,255,.96); border: 1px solid #cbd5e1; box-shadow: 0 4px 14px rgba(15,23,42,.14); border-radius: 12px; }
+        .map-title { padding: 10px 14px; font-weight: 800; font-size: 15px; }
+        .map-back { padding: 10px 12px; color: #0f766e; text-decoration: none; font-weight: 800; font-size: 14px; }
+        .map-hint { position: fixed; z-index: 1000; bottom: 22px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 40px); padding: 9px 12px; background: rgba(255,255,255,.94); border-radius: 12px; box-shadow: 0 3px 12px rgba(15,23,42,.12); color: #475569; font-size: 13px; font-weight: 700; text-align: center; pointer-events: none; }
+        .shop-popup { min-width: 150px; }
+        .shop-popup strong { display: block; font-size: 15px; margin-bottom: 4px; color: #0f172a; }
+        .shop-popup span { color: #64748b; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="map-header">
+        <div class="map-title">🗺️ 太平合作店家地圖</div>
+        <a class="map-back" href="/index.html">返回電子護照</a>
+    </div>
+    <div id="map"></div>
+    <div class="map-hint">點數字可展開密集店家；點圖示可看店家資訊</div>
+    <script>
+        const getCategory = (category) => {
+            const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
+            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('gift')) return 'snack';
+            return 'restaurant-stay';
+        };
+        const escapeHtml = (value) => String(value || '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+        const map = L.map('map', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+        const markers = typeof L.markerClusterGroup === 'function'
+            ? L.markerClusterGroup({ maxClusterRadius: 65, spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true })
+            : L.layerGroup();
+        markers.addTo(map);
+
+        fetch('/api/shops')
+            .then(response => response.ok ? response.json() : Promise.reject(new Error('讀取失敗')))
+            .then(shops => {
+                const bounds = [];
+                (Array.isArray(shops) ? shops : []).forEach(shop => {
+                    const lat = Number(shop.lat);
+                    const lng = Number(shop.lng);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+                    const category = getCategory(shop.category);
+                    const color = category === 'snack' ? '#258398' : '#e7a810';
+                    const emoji = category === 'snack' ? '🎁' : (String(shop.category || '').toLowerCase().includes('住宿') || String(shop.category || '').toLowerCase().includes('stay') ? '🏠' : '🍽️');
+                    const icon = L.divIcon({
+                        className: 'shop-marker',
+                        iconSize: [42, 42],
+                        iconAnchor: [21, 21],
+                        html: `<div style="width:42px;height:42px;border-radius:50%;background:#fff;border:4px solid ${color};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(15,23,42,.22);font-size:20px">${emoji}</div>`
+                    });
+                    const details = [shop.address, shop.services].filter(Boolean).map(escapeHtml).join('<br>');
+                    const marker = L.marker([lat, lng], { icon }).bindPopup(`<div class="shop-popup"><strong>${escapeHtml(shop.name)}</strong><span>${details || '合作店家'}</span></div>`);
+                    markers.addLayer(marker);
+                    bounds.push([lat, lng]);
+                });
+                if (bounds.length) map.fitBounds(bounds, { padding: [45, 45], maxZoom: 17 });
+            })
+            .catch(() => { document.querySelector('.map-hint').textContent = '暫時無法載入合作店家，請稍後再試'; });
+    </script>
+</body>
+</html>
