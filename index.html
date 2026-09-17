@@ -21,6 +21,9 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
@@ -813,7 +816,8 @@
 
         function MapComponent({ onMarkerClick, activeTab, shops, isExpanded, onToggleExpanded }) {
             const mapRef = useRef(null);
-            const containerRef = useRef(null); 
+            const containerRef = useRef(null);
+            const markerLayerRef = useRef(null);
             
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
@@ -839,8 +843,20 @@
                         maxZoom: 19,
                         attribution: '© OpenStreetMap contributors' 
                     }).addTo(map);
+
+                    // 密集店家先合併為群集；點選後自動放大，最大縮放時會展開重疊標記。
+                    const markerLayer = typeof L.markerClusterGroup === 'function'
+                        ? L.markerClusterGroup({
+                            maxClusterRadius: 65,
+                            spiderfyOnMaxZoom: true,
+                            showCoverageOnHover: false,
+                            zoomToBoundsOnClick: true
+                        })
+                        : L.layerGroup();
+                    markerLayer.addTo(map);
                     
                     mapRef.current = map;
+                    markerLayerRef.current = markerLayer;
                     setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
                 }
 
@@ -848,6 +864,7 @@
                     if (mapRef.current) {
                         mapRef.current.remove();
                         mapRef.current = null;
+                        markerLayerRef.current = null;
                     }
                 };
             }, []); 
@@ -861,7 +878,9 @@
             useEffect(() => {
                 if (mapRef.current && shops && shops.length > 0) {
                     const map = mapRef.current;
-                    map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+                    const markerLayer = markerLayerRef.current;
+                    if (!markerLayer) return;
+                    markerLayer.clearLayers();
                     
                     const bounds = [];
                     shops.forEach(shop => {
@@ -876,8 +895,9 @@
                                 </div>
                             `;
                             const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
-                            const marker = L.marker([shop.lat, shop.lng], { icon: customIcon }).addTo(map);
+                            const marker = L.marker([shop.lat, shop.lng], { icon: customIcon });
                             marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
+                            markerLayer.addLayer(marker);
                         }
                     });
                     if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
@@ -892,6 +912,9 @@
                     >
                         {isExpanded ? '✕ 關閉地圖' : '⛶ 放大地圖'}
                     </button>
+                    <div className="absolute top-4 left-4 z-[1000] bg-white/95 text-slate-600 border border-slate-200 shadow-sm rounded-xl px-3 py-2 text-xs font-bold">
+                        重疊店家會合併顯示，點數字可展開
+                    </div>
                     <div ref={containerRef} className="w-full h-full z-0 rounded-2xl relative cursor-pointer bg-slate-100"></div>
                 </>
             );
