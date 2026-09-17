@@ -818,6 +818,20 @@
             const mapRef = useRef(null);
             const containerRef = useRef(null);
             const markerLayerRef = useRef(null);
+
+            const createClusterIcon = (cluster) => {
+                const markers = cluster.getAllChildMarkers();
+                const snackCount = markers.filter(marker => marker.options.shopCategory === 'snack_souvenir').length;
+                const isSnack = snackCount >= markers.length - snackCount;
+                const color = isSnack ? '#258398' : '#e7a810';
+                const icon = isSnack ? '🎁' : '🍽️';
+                return L.divIcon({
+                    className: 'shop-marker-cluster',
+                    iconSize: [54, 54],
+                    iconAnchor: [27, 27],
+                    html: `<div style="width:54px;height:54px;border-radius:50%;background:#fff;border:4px solid ${color};box-shadow:0 3px 10px rgba(15,23,42,.22);display:flex;align-items:center;justify-content:center;gap:2px;font-weight:800;color:#334155"><span style="font-size:21px">${icon}</span><span style="font-size:15px">${markers.length}</span></div>`
+                });
+            };
             
             const getCategoryEmoji = (categories) => {
                 if (!categories || categories.length === 0) return '📍';
@@ -850,7 +864,8 @@
                             maxClusterRadius: 65,
                             spiderfyOnMaxZoom: true,
                             showCoverageOnHover: false,
-                            zoomToBoundsOnClick: true
+                            zoomToBoundsOnClick: true,
+                            iconCreateFunction: createClusterIcon
                         })
                         : L.layerGroup();
                     markerLayer.addTo(map);
@@ -896,6 +911,7 @@
                             `;
                             const customIcon = L.divIcon({ className: 'custom-map-marker', html: customHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
                             const marker = L.marker([shop.lat, shop.lng], { icon: customIcon });
+                            marker.options.shopCategory = getShopCategory(shop.category);
                             marker.on('click', () => { if(onMarkerClick) onMarkerClick(shop); });
                             markerLayer.addLayer(marker);
                         }
