@@ -561,7 +561,10 @@
                             </div>
 
                             {shopDisplayMode === 'map' ? (
-                                <div className={`${isMapExpanded ? 'fixed inset-0 z-[300] bg-white p-3' : 'bg-white rounded-2xl p-1 shadow-md border border-slate-200 h-[500px]'} w-full overflow-hidden relative animate-fade-in`}>
+                                <div
+                                    className={`${isMapExpanded ? 'fixed inset-0 z-[300] bg-white p-3' : 'bg-white rounded-2xl p-1 shadow-md border border-slate-200'} w-full overflow-hidden relative box-border animate-fade-in`}
+                                    style={{ height: isMapExpanded ? '100dvh' : '500px' }}
+                                >
                                     <MapComponent
                                         onMarkerClick={setSelectedShop}
                                         activeTab={activeTab}
