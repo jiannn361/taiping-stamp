@@ -184,6 +184,8 @@
             const [isCustomRedeem, setIsCustomRedeem] = useState(false);
             const [customRedeemStep, setCustomRedeemStep] = useState(1);
             const [customPointsInput, setCustomPointsInput] = useState('');
+            const [isCustomRedeeming, setIsCustomRedeeming] = useState(false);
+            const customRedeemLockRef = useRef(false);
             
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
@@ -314,6 +316,7 @@
             };
 
             const confirmCustomRedeem = async () => {
+                if (customRedeemLockRef.current) return;
                 const ptsToDeductInt = parseInt(customPointsInput, 10);
                 if (isNaN(ptsToDeductInt) || ptsToDeductInt <= 0) {
                     showToast('❌ 請輸入有效的點數數字！');
@@ -324,6 +327,9 @@
                     return;
                 }
                 
+                // 立即鎖定，避免畫面尚未重繪前的連點重複扣點。
+                customRedeemLockRef.current = true;
+                setIsCustomRedeeming(true);
                 showToast('⏳ 系統處理中...');
                 const serialNumber = `M-${Math.floor(100000 + Math.random() * 900000)}`; 
 
@@ -369,6 +375,9 @@
                     setStaffPassword('');
                 } catch(e) {
                     showToast('❌ 連線異常，請稍後再試。');
+                } finally {
+                    customRedeemLockRef.current = false;
+                    setIsCustomRedeeming(false);
                 }
             };
 
@@ -676,7 +685,7 @@
                                 <div className="bg-slate-700 p-4 text-center text-white flex items-center justify-between">
                                     <div className="w-6"></div>
                                     <h3 className="font-bold text-lg tracking-wider">🔧 紙本合併特殊核銷</h3>
-                                    <button onClick={() => {setIsCustomRedeem(false); setStaffPassword(''); setCustomPointsInput(''); setCustomRedeemStep(1);}} className="w-6 h-6 flex items-center justify-center bg-slate-600 rounded-full text-xs hover:bg-slate-500">✕</button>
+                                    <button disabled={isCustomRedeeming} onClick={() => {setIsCustomRedeem(false); setStaffPassword(''); setCustomPointsInput(''); setCustomRedeemStep(1);}} className="w-6 h-6 flex items-center justify-center bg-slate-600 rounded-full text-xs hover:bg-slate-500 disabled:opacity-50">✕</button>
                                 </div>
                                 <div className="p-6 text-center transition-all">
                                     
@@ -704,13 +713,14 @@
                                                 placeholder="輸入從手機扣除的點數 (例: 10)" 
                                                 value={customPointsInput} 
                                                 onChange={(e) => setCustomPointsInput(e.target.value)}
+                                                disabled={isCustomRedeeming}
                                                 className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-4 text-center text-2xl mb-2 outline-none focus:border-teal-400 transition-colors font-bold text-slate-800 placeholder:text-sm placeholder:font-normal"
                                             />
                                             <p className="text-xs text-rose-500 font-bold mb-6">⚠️ 點擊確認後將無法復原</p>
                                             
                                             <div className="flex space-x-3">
-                                                <button onClick={() => setCustomRedeemStep(1)} className="flex-[1] py-4 rounded-xl bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 transition-colors active:scale-95">上一步</button>
-                                                <button onClick={confirmCustomRedeem} className="flex-[2] py-4 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600 transition-colors text-lg active:scale-95">確認扣除</button>
+                                                <button disabled={isCustomRedeeming} onClick={() => setCustomRedeemStep(1)} className="flex-[1] py-4 rounded-xl bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 disabled:opacity-50 transition-colors active:scale-95">上一步</button>
+                                                <button disabled={isCustomRedeeming} onClick={confirmCustomRedeem} className="flex-[2] py-4 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70 transition-colors text-lg active:scale-95">{isCustomRedeeming ? <span className="flex items-center justify-center gap-2"><span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>傳送中…</span> : '確認扣除'}</button>
                                             </div>
                                         </div>
                                     )}
