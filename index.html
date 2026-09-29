@@ -70,8 +70,40 @@
 
         // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
-            'Ucf69096d6b2cbf209d63a7427491b24b': { id: 'S01', name: '太平雲梯測試', category: '餐廳' },
-            'U37c32d14410792ae9cba2d05d7189512': { id: 'S02', name: '太平雲梯服務中心', category: '伴手禮' },
+            'U37c32d14410792ae9cba2d05d7189512': { id: 'S00', name: '太平雲梯服務中心', category: '小吃/伴手禮' },
+            'U6cb37c9cb1e020d91c0d3426ffcae2be': { id: 'S01', name: '陳家鋪子', category: '小吃/伴手禮' },
+            'Uebecd455bd25d13af596bf359d65e4c9': { id: 'S02', name: '在梅間', category: '小吃/伴手禮' },
+            'Uabe6052fcd6c9fa1c36556f856a6c42b': { id: 'S03', name: '三美養蜂', category: '伴手禮' },
+            'Uc2db29fa44390d5d5045af859a2d0b50': { id: 'S04', name: '宏仁山產', category: '伴手禮' },
+            'U4b08f335d4c2e71a2b386ed06e81ce15': { id: 'S05', name: '大巃頂觀光茶園', category: '伴手禮' },
+            'U04e997d0f56f81d0599f86c0756b6dbf': { id: 'S06', name: '鮮味手工鮮蝦貢丸', category: '小吃' },
+            'U8d298971f04380009042123a6ea106b2': { id: 'S07', name: '新粿派', category: '小吃' },
+            'U796fde2696accb5eb8fec30e9c52a959': { id: 'S08', name: '邂浪漫生活坊', category: '伴手禮' },
+            'Udafbaebba96461b09162a308cefb369b': { id: 'S09', name: '亞麻幸福之家', category: '小吃/伴手禮' },
+            'U6ce50260dc883728905900b29ae9a6b2': { id: 'S10', name: '蜜雅茶業', category: '伴手禮' },
+            'U0d772205e77ea18525ff9ceabe5c3759': { id: 'S11', name: '蓮芝鄉', category: '伴手禮' },
+            'Uc7f2f9a167c0f4d83284cf83a9d6c7ba': { id: 'S12', name: '阿嬤古早味', category: '小吃/伴手禮' },
+            'U469db8dcc89e00689309e2187844bf36': { id: 'S13', name: '太平老街18號古厝', category: '小吃/伴手禮' },
+            'Ufeddcbd18f16e89ab57939c49b171872': { id: 'S14', name: '大坪牛肉麵', category: '小吃' },
+            'U43bab50d9bc917b05c5145facb44124a': { id: 'S15', name: '后咖啡', category: '小吃/伴手禮' },
+            'U08f8cad6b6367c7e710c4819b4ab399a': { id: 'S16', name: '冬瓜妹人文概念店', category: '小吃/伴手禮' },
+            'Ue9fa38386bbc2ba6ec8d7ef0b6cd9be9': { id: 'S17', name: '空氣圖書館', category: '餐廳' },
+            'Ue9e90ccef6059fac67e690c4932e0efc': { id: 'S18', name: '是菇的味', category: '小吃/伴手禮' },
+            'U63bcc9934af00256698fe5e41b14c75b': { id: 'S19', name: '巷仔內古早味小吃', category: '小吃' },
+            'Ub44f0568fa26a572f20d47b8c7904d3c': { id: 'S20', name: '太平米菓', category: '小吃/伴手禮' },
+            'Uc8dbef7344c23c45dd2d26fa86d11919': { id: 'S21', name: '52號菇菇的家', category: '小吃/伴手禮' },
+            'U38fe3029a89818c44555fbfdd8e6b50a': { id: 'S22', name: '潘圈圈', category: '小吃' },
+            'U8f2a2a16f5beb81bf9a7ce1f30fba9f2': { id: 'S23', name: '楊家古早味', category: '小吃' },
+            'Uaaf861ec58f7d3944b1e72ee9fa9bf47': { id: 'S24', name: '阿珠珠烏龍茶葉香腸', category: '小吃' },
+            'U144c4ed247893cc066f2ba9ad135adeb': { id: 'S25', name: '名村璘家田園', category: '小吃/伴手禮' },
+            'Ubd816999c5dd17b9ac9c882d22be0c78': { id: 'S26', name: '豆腐涼糕', category: '小吃/伴手禮' },
+            'Ub6b24920b894890c5aba2738c879ac8f': { id: 'S27', name: '太平雲菇', category: '小吃/伴手禮' },
+            'U6930ed9692dff988e7aad24296c20134': { id: 'S28', name: '孟宗竹筷', category: '伴手禮' },
+            'Ue35605c697073ccac6ca80ab89612895': { id: 'S29', name: '梅鋪子野生愛玉', category: '小吃/伴手禮' },
+            'U4254908939eb253f2476558a0845571e': { id: 'S30', name: '博揚活力小食之饞', category: '小吃/伴手禮' },
+            'U0827bd9ff72ebd184d382aa59de80a33': { id: 'S31', name: '山茶花茶居', category: '伴手禮' },
+            'U8e5278823a5480157f9622449360a45a': { id: 'S32', name: '雲境山城', category: '餐廳' },
+            'U08c1ddc1d22aecab7d57ff8aa0983024': { id: 'S33', name: '碧峯工坊', category: '伴手禮' },
             // 格式範例：
             // 'U1234567890abcdef1234567890abcdef': { id: 'S01', name: '太平老街冬瓜茶', category: '小吃與伴手禮' },
             // 'U22222222222222222222222222222222': { id: 'S02', name: '太平景觀餐廳', category: '餐廳' },
@@ -851,7 +883,7 @@
                     }).addTo(map);
 
                     mapRef.current = map;
-                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 250);
+                    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize({ pan: false, debounceMoveend: true }); }, 250);
                 }
 
                 return () => {
@@ -864,7 +896,7 @@
 
             useEffect(() => {
                 if (mapRef.current) {
-                    setTimeout(() => mapRef.current?.invalidateSize(), 100);
+                    setTimeout(() => mapRef.current?.invalidateSize({ pan: false, debounceMoveend: true }), 100);
                 }
             }, [isExpanded]);
 
