@@ -53,9 +53,18 @@
         // 店家資料可能使用中文或英文分類；餐廳與住宿在前端視為同一集點類別。
         const getShopCategory = (category) => {
             const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
-            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('gift')) return 'snack_souvenir';
-            if (value.includes('餐廳') || value.includes('住宿') || value.includes('民宿') || value.includes('restaurant') || value.includes('stay')) return 'restaurant_stay';
+            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('snack') || value.includes('gift') || value.includes('souvenir')) return 'snack_souvenir';
+            if (value.includes('餐廳') || value.includes('住宿') || value.includes('民宿') || value.includes('restaurant') || value.includes('stay') || value.includes('hotel') || value.includes('lodging')) return 'restaurant_stay';
             return 'snack_souvenir';
+        };
+
+        // 地圖與店家名單依原始店家類型顯示圖示；發點仍使用上方的兩大類別。
+        const getShopCategoryEmoji = (category) => {
+            const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
+            if (value.includes('住宿') || value.includes('民宿') || value.includes('stay') || value.includes('hotel') || value.includes('lodging')) return '🏠';
+            if (value.includes('伴手禮') || value.includes('禮品') || value.includes('souvenir') || value.includes('gift')) return '🎁';
+            if (value.includes('餐廳') || value.includes('小吃') || value.includes('restaurant') || value.includes('food') || value.includes('snack')) return '🍽️';
+            return '📍';
         };
 
         const getCategoryPoints = (points, category) => {
@@ -647,11 +656,7 @@
                                             <div className="text-center py-12 text-slate-400 font-bold text-sm">此分類目前沒有店家</div>
                                         ) : (
                                             processedShops.map(shop => {
-                                                const catStr = Array.isArray(shop.category) ? shop.category.join(',').toLowerCase() : String(shop.category || '').toLowerCase();
-                                                let icon = '📍';
-                                                if (getShopCategory(catStr) === 'snack_souvenir') icon = '🎁';
-                                                else if (catStr.includes('住宿') || catStr.includes('stay') || catStr.includes('民宿')) icon = '🏠';
-                                                else if (getShopCategory(catStr) === 'restaurant_stay') icon = '🍽️';
+                                                const icon = getShopCategoryEmoji(shop.category);
 
                                                 return (
                                                     <div key={shop.id} onClick={() => setSelectedShop(shop)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between cursor-pointer hover:border-teal-300 transition-colors active:scale-95">
@@ -858,12 +863,7 @@
             const containerRef = useRef(null);
             
             const getCategoryEmoji = (categories) => {
-                if (!categories || categories.length === 0) return '📍';
-                const cat = Array.isArray(categories) ? categories[0].toLowerCase() : categories.toLowerCase();
-                if (getShopCategory(cat) === 'snack_souvenir') return '🎁';
-                if (cat.includes('住宿') || cat.includes('stay') || cat.includes('民宿')) return '🏠';
-                if (getShopCategory(cat) === 'restaurant_stay') return '🍽️';
-                return '📍';
+                return getShopCategoryEmoji(categories);
             };
 
             const getCategoryColor = (category) => {

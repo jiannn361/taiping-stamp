@@ -38,8 +38,16 @@
 
         const getCategory = (category) => {
             const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
-            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('gift')) return 'snack';
-            return 'restaurant-stay';
+            if (value.includes('小吃') || value.includes('伴手禮') || value.includes('food') || value.includes('snack') || value.includes('gift') || value.includes('souvenir')) return 'snack';
+            if (value.includes('餐廳') || value.includes('住宿') || value.includes('民宿') || value.includes('restaurant') || value.includes('stay') || value.includes('hotel') || value.includes('lodging')) return 'restaurant-stay';
+            return 'snack';
+        };
+        const getCategoryEmoji = (category) => {
+            const value = (Array.isArray(category) ? category.join(',') : String(category || '')).toLowerCase();
+            if (value.includes('住宿') || value.includes('民宿') || value.includes('stay') || value.includes('hotel') || value.includes('lodging')) return '🏠';
+            if (value.includes('伴手禮') || value.includes('禮品') || value.includes('souvenir') || value.includes('gift')) return '🎁';
+            if (value.includes('餐廳') || value.includes('小吃') || value.includes('restaurant') || value.includes('food') || value.includes('snack')) return '🍽️';
+            return '📍';
         };
         const escapeHtml = (value) => String(value || '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
         const map = L.map('map', { zoomControl: false, tap: false }).setView([23.559, 120.605], 16);
@@ -59,7 +67,7 @@
                     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
                     const category = getCategory(shop.category);
                     const color = category === 'snack' ? '#258398' : '#e7a810';
-                    const emoji = category === 'snack' ? '🎁' : (String(shop.category || '').toLowerCase().includes('住宿') || String(shop.category || '').toLowerCase().includes('stay') ? '🏠' : '🍽️');
+                    const emoji = getCategoryEmoji(shop.category);
                     const icon = L.divIcon({
                         className: 'shop-marker',
                         iconSize: [42, 42],
