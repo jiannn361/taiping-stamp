@@ -75,7 +75,6 @@
         };
 
         const SHOW_REDEMPTION = true;
-        const SHOW_CUSTOM_REDEMPTION = true;
 
         // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
@@ -222,11 +221,11 @@
             const [selectedShop, setSelectedShop] = useState(null);
             const [isMapExpanded, setIsMapExpanded] = useState(false);
             
-            const [isCustomRedeem, setIsCustomRedeem] = useState(false);
-            const [customRedeemStep, setCustomRedeemStep] = useState(1);
-            const [customPointsInput, setCustomPointsInput] = useState('');
-            const [isCustomRedeeming, setIsCustomRedeeming] = useState(false);
-            const customRedeemLockRef = useRef(false);
+            const [redeemStep, setRedeemStep] = useState(1);
+            const [paperPointsInput, setPaperPointsInput] = useState('0');
+            const [isRedeeming, setIsRedeeming] = useState(false);
+            const [redeemGifts, setRedeemGifts] = useState([]);
+            const redeemLockRef = useRef(false);
             
             const [shopDisplayMode, setShopDisplayMode] = useState('map'); 
             const [shopsData, setShopsData] = useState([]); 
@@ -284,26 +283,83 @@
                 return () => { isMounted = false; };
             }, [activeTab]);
 
+            useEffect(() => {
+                let isMounted = true;
+                if (activeTab === 'card') {
+                    fetch('/api/rewards')
+                        .then(async res => {
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) throw new Error(data.error || '無法讀取兌換品項');
+                            return data;
+                        })
+                        .then(data => {
+                            if (isMounted) setRedeemGifts(Array.isArray(data) ? data : []);
+                        })
+                        .catch(() => {
+                            if (isMounted) setRedeemGifts([]);
+                            showToast('❌ 兌換品項讀取失敗，請稍後再試。');
+                        });
+                }
+                return () => { isMounted = false; };
+            }, [activeTab]);
+
             // 部分既有資料的 total 欄位不會同步更新，因此優先以各分類點數加總。
             const categoryTotal = getCategoryPoints(customerPoints, 'snack_souvenir') + getCategoryPoints(customerPoints, 'restaurant_stay');
             const totalPoints = categoryTotal > 0 ? categoryTotal : (customerPoints.total || 0);
 
-            // 確定品項後，將獎項資料加入此陣列即可顯示於兌換頁。
-            const redeemGifts = [];
-
             const initiateRedeem = (gift) => {
-                if (totalPoints >= gift.cost) setRedeemModal(gift); 
-                else showToast('❌ 點數不足喔！請繼續在商圈消費集點。');
-            };
-
-            const confirmStaffRedeem = async () => {
-                if (staffPassword !== '1688') {
-                    showToast('❌ 工作人員密碼錯誤！');
+                if (Number(gift.stock) <= 0 || gift.status === '售罄') {
+                    showToast('❌ 此商品已兌換完畢。');
                     return;
                 }
-                
-                showToast('⏳ 系統處理中...');
-                const serialNumber = `R-${Math.floor(100000 + Math.random() * 900000)}`;
+                setRedeemModal(gift);
+                setRedeemStep(1);
+                setPaperPointsInput('0');
+                setStaffPassword('');
+            };
+
+            const confirmStaffIdentity = async () => {
+                if (!staffPassword || isRedeeming) return;
+                setIsRedeeming(true);
+                try {
+                    const res = await fetch('/api/points', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'verifyStaff', staffPassword })
+                    });
+                    const result = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        showToast(`❌ ${result.error || '工作人員密碼錯誤'}`);
+                        return;
+                    }
+                    setRedeemStep(2);
+                } catch (e) {
+                    showToast('❌ 無法驗證身分，請稍後再試。');
+                } finally {
+                    setIsRedeeming(false);
+                }
+            };
+
+            const confirmUnifiedRedeem = async () => {
+                if (redeemLockRef.current || !redeemModal) return;
+
+                const cost = Number(redeemModal.cost) || 0;
+                const paperPoints = Number(paperPointsInput);
+                if (!Number.isInteger(paperPoints) || paperPoints < 0 || paperPoints > cost) {
+                    showToast(`❌ 紙本點數請輸入 0 到 ${cost} 的整數。`);
+                    return;
+                }
+
+                const electronicPoints = cost - paperPoints;
+                if (electronicPoints > totalPoints) {
+                    const minimumPaper = Math.max(0, cost - totalPoints);
+                    showToast(`❌ 電子點數不足，紙本至少需要 ${minimumPaper} 點。`);
+                    return;
+                }
+
+                redeemLockRef.current = true;
+                setIsRedeeming(true);
+                showToast('⏳ 系統核銷中...');
 
                 try {
                     const res = await fetch('/api/points', {
@@ -312,113 +368,38 @@
                         body: JSON.stringify({
                             uid: shortUid,
                             userName: nameString,
-                            action: 'deduct',
-                            points: redeemModal.cost,
-                            giftName: redeemModal.name,
-                            sn: serialNumber,
-                            staffPassword: staffPassword 
+                            action: 'redeem',
+                            productId: redeemModal.id,
+                            quantity: 1,
+                            electronicPoints,
+                            paperPoints,
+                            staffPassword
                         })
                     });
 
+                    const result = await res.json().catch(() => ({}));
                     if (!res.ok) {
-                        const err = await res.json();
-                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
+                        showToast(`❌ 核銷失敗：${result.error || '資料異常'}`);
                         return;
                     }
 
                     showToast('✅ 核銷成功！');
                     const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: serialNumber, time: timeStr }, ...prev]);
-
-                    let ptsToDeduct = redeemModal.cost;
-                    let newPoints = { ...customerPoints };
-                    // 🌟 依照新版順序扣除
-                    for (let cat of ['snack_souvenir', 'restaurant', 'stay']) {
-                        if (ptsToDeduct <= 0) break;
-                        if (newPoints[cat] >= ptsToDeduct) { newPoints[cat] -= ptsToDeduct; ptsToDeduct = 0; }
-                        else { ptsToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
-                    }
-                    newPoints.total -= redeemModal.cost;
-                    setCustomerPoints(newPoints);
+                    setRedeemHistory(prev => [{ giftName: redeemModal.name, sn: result.redemptionId || '已核銷', time: timeStr }, ...prev]);
+                    if (result.points) setCustomerPoints(result.points);
+                    setRedeemGifts(prev => prev.map(gift => gift.id === redeemModal.id
+                        ? { ...gift, stock: Math.max(0, Number(gift.stock) - 1), status: Number(gift.stock) <= 1 ? '售罄' : gift.status }
+                        : gift));
 
                     setRedeemModal(null);
-                    setStaffPassword('');
-                } catch(e) {
-                    showToast('❌ 連線異常，請稍後再試。');
-                }
-            };
-
-            const handleCustomRedeemNextStep = () => {
-                if (staffPassword !== '1688') {
-                    showToast('❌ 工作人員密碼錯誤！');
-                    return;
-                }
-                setCustomRedeemStep(2); 
-            };
-
-            const confirmCustomRedeem = async () => {
-                if (customRedeemLockRef.current) return;
-                const ptsToDeductInt = parseInt(customPointsInput, 10);
-                if (isNaN(ptsToDeductInt) || ptsToDeductInt <= 0) {
-                    showToast('❌ 請輸入有效的點數數字！');
-                    return;
-                }
-                if (ptsToDeductInt > totalPoints) {
-                    showToast('❌ 扣除點數不能大於遊客目前的總點數！');
-                    return;
-                }
-                
-                // 立即鎖定，避免畫面尚未重繪前的連點重複扣點。
-                customRedeemLockRef.current = true;
-                setIsCustomRedeeming(true);
-                showToast('⏳ 系統處理中...');
-                const serialNumber = `M-${Math.floor(100000 + Math.random() * 900000)}`; 
-
-                try {
-                    const res = await fetch('/api/points', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            uid: shortUid,
-                            userName: nameString,
-                            action: 'deduct',
-                            points: ptsToDeductInt,
-                            giftName: `【紙本合併兌換】`,
-                            sn: serialNumber,
-                            staffPassword: staffPassword 
-                        })
-                    });
-
-                    if (!res.ok) {
-                        const err = await res.json();
-                        showToast(`❌ 扣點失敗：${err.error || '點數異常'}`);
-                        return;
-                    }
-
-                    showToast('✅ 特殊核銷成功！');
-                    const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    setRedeemHistory(prev => [{ giftName: `與紙本合併兌換 (扣 ${ptsToDeductInt} 點)`, sn: serialNumber, time: timeStr }, ...prev]);
-
-                    let remainingToDeduct = ptsToDeductInt;
-                    let newPoints = { ...customerPoints };
-                    // 🌟 依照新版順序扣除
-                    for (let cat of ['snack_souvenir', 'restaurant', 'stay']) {
-                        if (remainingToDeduct <= 0) break;
-                        if (newPoints[cat] >= remainingToDeduct) { newPoints[cat] -= remainingToDeduct; remainingToDeduct = 0; }
-                        else { remainingToDeduct -= newPoints[cat]; newPoints[cat] = 0; }
-                    }
-                    newPoints.total -= ptsToDeductInt;
-                    setCustomerPoints(newPoints);
-
-                    setIsCustomRedeem(false);
-                    setCustomRedeemStep(1);
-                    setCustomPointsInput('');
+                    setRedeemStep(1);
+                    setPaperPointsInput('0');
                     setStaffPassword('');
                 } catch(e) {
                     showToast('❌ 連線異常，請稍後再試。');
                 } finally {
-                    customRedeemLockRef.current = false;
-                    setIsCustomRedeeming(false);
+                    redeemLockRef.current = false;
+                    setIsRedeeming(false);
                 }
             };
 
@@ -533,7 +514,8 @@
                                     <p className="text-sm text-slate-400 mt-2">敬請期待活動公告</p>
                                 </div>
                             ) : redeemGifts.map(gift => {
-                                const canRedeem = totalPoints >= gift.cost;
+                                const canRedeem = Number(gift.stock) > 0 && gift.status !== '售罄';
+                                const needsPaper = totalPoints < Number(gift.cost);
                                 return (
                                     <div key={gift.id} onClick={() => initiateRedeem(gift)} className={`bg-white p-4 rounded-2xl shadow-sm border-2 transition-all ${canRedeem ? 'border-teal-500 cursor-pointer active:scale-95' : 'border-slate-100 opacity-60'}`}>
                                         <div className="flex justify-between items-center">
@@ -542,22 +524,14 @@
                                                 <div>
                                                     <div className="font-bold text-slate-800">{gift.name}</div>
                                                     <div className={`text-sm font-bold mt-1 ${canRedeem ? 'text-teal-600' : 'text-slate-400'}`}>{gift.cost} 點</div>
+                                                    <div className="text-xs text-slate-400 mt-1">剩餘 {Math.max(0, Number(gift.stock) || 0)} 份{needsPaper && canRedeem ? '・可搭配紙本' : ''}</div>
                                                 </div>
                                             </div>
-                                            <button className={`px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors ${canRedeem ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-300'}`}>兌換</button>
+                                            <button disabled={!canRedeem} className={`px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-colors ${canRedeem ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-300'}`}>{canRedeem ? '兌換' : '已兌完'}</button>
                                         </div>
                                     </div>
                                 );
                             })}
-                            
-                            {/* 服務台專用的「紙本合併扣點」入口 */}
-                            {SHOW_CUSTOM_REDEMPTION && <div className="mt-8 pt-6 border-t-2 border-slate-100 border-dashed animate-fade-in">
-                                <button onClick={() => { setIsCustomRedeem(true); setCustomRedeemStep(1); }} className="w-full py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl text-sm border border-slate-200 hover:bg-slate-200 transition-colors flex items-center justify-center space-x-2">
-                                    <span className="text-lg">🔧</span>
-                                    <span>服務台專用特殊核銷</span>
-                                </button>
-                                <p className="text-[10px] text-center text-slate-400 mt-2">僅供遊客同時持紙本與電子點數時，由服務台操作</p>
-                            </div>}
                         </div>
                     )}
 
@@ -627,7 +601,7 @@
                                 <div className="space-y-4 animate-fade-in pb-10">
                                     <div className="grid grid-cols-2 gap-3">
                                         {[
-                                            { id: 'snack_souvenir', name: '小吃/伴手禮', icon: '🎁', bg: 'bg-[#258398]', text: 'text-white' },
+                                            { id: 'snack_souvenir', name: '小吃/伴手禮', icon: '🍽️🎁', bg: 'bg-[#258398]', text: 'text-white' },
                                             { id: 'restaurant_stay', name: '餐廳/住宿', icon: '🍽️🏠', bg: 'bg-[#e7a810]', text: 'text-amber-950' }
                                          ].map(cat => {
                                             const isActive = listCategory === cat.id;
@@ -697,71 +671,62 @@
                     {redeemModal && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
                             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in relative z-50">
-                                <div className="bg-rose-500 p-4 text-center text-white">
-                                    <h3 className="font-bold text-lg">⚠️ 服務台人員核銷專區</h3>
-                                </div>
-                                <div className="p-6 text-center">
-                                    <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
-                                    <p className="text-rose-500 font-bold mb-6 bg-rose-50 inline-block px-3 py-1 rounded-full text-sm">將扣除 {redeemModal.cost} 點</p>
-                                    <input 
-                                        type="password" placeholder="輸入密碼" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-xl mb-6 outline-none focus:border-rose-400 transition-colors"
-                                    />
-                                    <div className="flex space-x-3">
-                                        <button onClick={() => {setRedeemModal(null); setStaffPassword('');}} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">取消</button>
-                                        <button onClick={confirmStaffRedeem} className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600">確認扣點</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {isCustomRedeem && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-5">
-                            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slide-up relative z-50">
-                                <div className="bg-slate-700 p-4 text-center text-white flex items-center justify-between">
+                                <div className="bg-slate-800 p-4 text-center text-white flex items-center justify-between">
                                     <div className="w-6"></div>
-                                    <h3 className="font-bold text-lg tracking-wider">🔧 紙本合併特殊核銷</h3>
-                                    <button disabled={isCustomRedeeming} onClick={() => {setIsCustomRedeem(false); setStaffPassword(''); setCustomPointsInput(''); setCustomRedeemStep(1);}} className="w-6 h-6 flex items-center justify-center bg-slate-600 rounded-full text-xs hover:bg-slate-500 disabled:opacity-50">✕</button>
+                                    <h3 className="font-bold text-lg">服務台統一核銷</h3>
+                                    <button disabled={isRedeeming} onClick={() => { setRedeemModal(null); setRedeemStep(1); setPaperPointsInput('0'); setStaffPassword(''); }} className="w-6 h-6 flex items-center justify-center bg-slate-700 rounded-full text-xs disabled:opacity-50">✕</button>
                                 </div>
                                 <div className="p-6 text-center transition-all">
-                                    
-                                    {customRedeemStep === 1 ? (
+                                    <p className="font-bold text-xl mb-2 mt-1">{redeemModal.name}</p>
+                                    <p className="text-rose-500 font-bold mb-5 bg-rose-50 inline-block px-3 py-1 rounded-full text-sm">需要 {redeemModal.cost} 點</p>
+
+                                    {redeemStep === 1 ? (
                                         <div className="animate-fade-in">
-                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">請先驗證身分</p>
-                                            <input 
-                                                type="password" 
-                                                placeholder="請輸入服務台密碼" 
-                                                value={staffPassword} 
+                                            <p className="text-sm text-slate-500 mb-4 font-bold">第一步：請工作人員驗證身分</p>
+                                            <input
+                                                type="password"
+                                                placeholder="輸入工作人員密碼"
+                                                value={staffPassword}
                                                 onChange={(e) => setStaffPassword(e.target.value)}
                                                 className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-4 text-center text-2xl mb-6 outline-none focus:border-rose-400 transition-colors tracking-widest"
                                             />
-                                            <button onClick={handleCustomRedeemNextStep} className="w-full py-4 rounded-xl bg-slate-800 text-white font-bold shadow-md hover:bg-slate-900 transition-colors text-lg active:scale-95">下一步</button>
+                                            <div className="flex space-x-3">
+                                                <button onClick={() => { setRedeemModal(null); setStaffPassword(''); }} className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-600 font-bold">取消</button>
+                                                <button disabled={isRedeeming || !staffPassword} onClick={confirmStaffIdentity} className="flex-[2] py-4 rounded-xl bg-slate-800 text-white font-bold shadow-md disabled:opacity-50">{isRedeeming ? '驗證中…' : '下一步'}</button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="animate-fade-in">
-                                            <div className="flex justify-center mb-2">
+                                            <div className="flex justify-center mb-4">
                                                 <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">✅ 密碼驗證通過</span>
                                             </div>
-                                            <p className="text-sm text-slate-500 mb-4 font-bold tracking-wide">設定扣除額度</p>
-                                            
-                                            <input 
-                                                type="number" 
-                                                placeholder="輸入從手機扣除的點數 (例: 10)" 
-                                                value={customPointsInput} 
-                                                onChange={(e) => setCustomPointsInput(e.target.value)}
-                                                disabled={isCustomRedeeming}
-                                                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-4 text-center text-2xl mb-2 outline-none focus:border-teal-400 transition-colors font-bold text-slate-800 placeholder:text-sm placeholder:font-normal"
+                                            <div className="bg-slate-50 rounded-2xl p-4 mb-4 text-left space-y-2 text-sm">
+                                                <div className="flex justify-between"><span className="text-slate-500">商品所需</span><b>{redeemModal.cost} 點</b></div>
+                                                <div className="flex justify-between"><span className="text-slate-500">目前電子點數</span><b className="text-teal-600">{totalPoints} 點</b></div>
+                                            </div>
+                                            <label className="text-sm text-slate-600 font-bold block mb-2">本次使用紙本貼紙點數</label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                min="0"
+                                                max={redeemModal.cost}
+                                                step="1"
+                                                value={paperPointsInput}
+                                                onChange={(e) => setPaperPointsInput(e.target.value)}
+                                                disabled={isRedeeming}
+                                                className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-2xl mb-4 outline-none focus:border-teal-400 font-bold"
                                             />
-                                            <p className="text-xs text-rose-500 font-bold mb-6">⚠️ 點擊確認後將無法復原</p>
-                                            
+                                            <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-5 space-y-2 text-sm">
+                                                <div className="flex justify-between"><span>電子扣點</span><b>{Math.max(0, Number(redeemModal.cost) - (Number(paperPointsInput) || 0))} 點</b></div>
+                                                <div className="flex justify-between"><span>紙本點數</span><b>{Number(paperPointsInput) || 0} 點</b></div>
+                                                <div className="border-t border-teal-200 pt-2 flex justify-between text-base"><span className="font-bold">總核銷點數</span><b>{redeemModal.cost} 點</b></div>
+                                            </div>
                                             <div className="flex space-x-3">
-                                                <button disabled={isCustomRedeeming} onClick={() => setCustomRedeemStep(1)} className="flex-[1] py-4 rounded-xl bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 disabled:opacity-50 transition-colors active:scale-95">上一步</button>
-                                                <button disabled={isCustomRedeeming} onClick={confirmCustomRedeem} className="flex-[2] py-4 rounded-xl bg-rose-500 text-white font-bold shadow-md hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70 transition-colors text-lg active:scale-95">{isCustomRedeeming ? <span className="flex items-center justify-center gap-2"><span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>傳送中…</span> : '確認扣除'}</button>
+                                                <button disabled={isRedeeming} onClick={() => setRedeemStep(1)} className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-500 font-bold disabled:opacity-50">上一步</button>
+                                                <button disabled={isRedeeming} onClick={confirmUnifiedRedeem} className="flex-[2] py-4 rounded-xl bg-rose-500 text-white font-bold shadow-md disabled:opacity-60">{isRedeeming ? '核銷中…' : '確認核銷'}</button>
                                             </div>
                                         </div>
                                     )}
-
                                 </div>
                             </div>
                         </div>
