@@ -76,6 +76,45 @@
 
         const SHOW_REDEMPTION = true;
 
+        const waitFor = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+        const createTransactionId = (prefix = 'TX') => {
+            const randomPart = window.crypto?.randomUUID
+                ? window.crypto.randomUUID()
+                : `${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+            return `${prefix}-${Date.now()}-${randomPart}`.slice(0, 100);
+        };
+
+        // 僅針對逾時、流量限制或伺服器忙碌重試；一般資料錯誤不重送。
+        const fetchWithRetry = async (url, options = {}, config = {}) => {
+            const maxAttempts = config.maxAttempts || 3;
+            const timeoutMs = config.timeoutMs || 12000;
+            const baseDelayMs = config.baseDelayMs || 1200;
+            let lastError;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const response = await fetch(url, { ...options, signal: controller.signal });
+                    const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+                    if (!retryable || attempt === maxAttempts - 1) return response;
+                    lastError = new Error(`暫時性伺服器錯誤：${response.status}`);
+                } catch (error) {
+                    lastError = error;
+                    if (attempt === maxAttempts - 1) throw error;
+                } finally {
+                    clearTimeout(timeout);
+                }
+
+                // 1.2 秒、2.4 秒逐次延長，並加入少量亂數避免所有手機同時重送。
+                const delay = baseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 400);
+                await waitFor(delay);
+            }
+
+            throw lastError || new Error('連線失敗');
+        };
+
         // 試驗期間：將合作店家的 LINE UID、店名與固定發點分類填入此處。
         const SHOP_ADMINS = {
             'U37c32d14410792ae9cba2d05d7189512': { id: 'S00', name: '太平雲梯服務中心', category: '小吃/伴手禮' },
@@ -246,7 +285,7 @@
                 const fetchPoints = async () => {
                     if (!shortUid) return;
                     try {
-                        const res = await fetch(`/api/points?uid=${shortUid}`);
+                        const res = await fetchWithRetry(`/api/points?uid=${shortUid}`);
                         if (res.ok && isMounted) {
                             const data = await res.json();
                             // 🌟 確保新版 GAS 的欄位都有傳過來
@@ -261,7 +300,7 @@
                     if (document.visibilityState === 'visible') fetchPoints();
                 };
                 fetchPoints();
-                const interval = setInterval(refreshVisiblePoints, 30000);
+                const interval = setInterval(refreshVisiblePoints, 60000);
                 document.addEventListener('visibilitychange', refreshVisiblePoints);
                 return () => {
                     isMounted = false;
@@ -273,7 +312,7 @@
             useEffect(() => {
                 let isMounted = true;
                 if (activeTab === 'map' && shopsData.length === 0) {
-                    fetch('/api/shops')
+                    fetchWithRetry('/api/shops')
                         .then(async res => {
                             const data = await res.json().catch(() => ({}));
                             if (!res.ok) {
@@ -296,7 +335,7 @@
             useEffect(() => {
                 let isMounted = true;
                 if (activeTab === 'card') {
-                    fetch('/api/rewards')
+                    fetchWithRetry('/api/rewards')
                         .then(async res => {
                             const data = await res.json().catch(() => ({}));
                             if (!res.ok) throw new Error(data.error || '無法讀取兌換品項');
@@ -333,7 +372,7 @@
                 if (!staffPassword || isRedeeming) return;
                 setIsRedeeming(true);
                 try {
-                    const res = await fetch('/api/points', {
+                    const res = await fetchWithRetry('/api/points', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'verifyStaff', staffPassword })
@@ -373,10 +412,12 @@
                 showToast('⏳ 系統核銷中...');
 
                 try {
-                    const res = await fetch('/api/points', {
+                    const transactionId = createTransactionId('RED');
+                    const res = await fetchWithRetry('/api/points', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            transactionId,
                             uid: shortUid,
                             userName: nameString,
                             action: 'redeem',
@@ -1005,7 +1046,7 @@
                 const shopUid = userProfile?.userId;
                 if (!shopUid) return;
                 try {
-                    const res = await fetch(`/api/quota?shopUid=${encodeURIComponent(shopUid)}`, { cache: 'no-store' });
+                    const res = await fetchWithRetry(`/api/quota?shopUid=${encodeURIComponent(shopUid)}`, { cache: 'no-store' });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || '無法讀取店家額度');
                     setShopQuota(data);
@@ -1020,7 +1061,7 @@
                     if (document.visibilityState === 'visible') loadShopQuota();
                 };
                 loadShopQuota();
-                const quotaInterval = setInterval(refreshVisibleQuota, 60000);
+                const quotaInterval = setInterval(refreshVisibleQuota, 120000);
                 document.addEventListener('visibilitychange', refreshVisibleQuota);
                 return () => {
                     clearInterval(quotaInterval);
@@ -1091,7 +1132,7 @@
                 setIsQuerying(true);
                 showToast('⏳ 查詢遊客資料中...');
                 try {
-                    const res = await fetch(`/api/points?uid=${manualCode}`);
+                    const res = await fetchWithRetry(`/api/points?uid=${manualCode}`);
                     if (res.ok) {
                         const data = await res.json();
                         setScannedUid(manualCode);
@@ -1132,6 +1173,7 @@
 
                 try {
                     const payload = {
+                        transactionId: createTransactionId('ISS'),
                         uid: scannedUid,
                         action: 'add',
                         // 分類由此 UID 的固定設定帶入，店家介面不提供切換。
@@ -1146,7 +1188,7 @@
                         payload.userName = scannedName;
                     }
 
-                    const res = await fetch('/api/points', {
+                    const res = await fetchWithRetry('/api/points', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
