@@ -257,9 +257,17 @@
                     } catch(e) {}
                 };
                 
-                fetchPoints(); 
-                const interval = setInterval(fetchPoints, 15000); 
-                return () => { isMounted = false; clearInterval(interval); };
+                const refreshVisiblePoints = () => {
+                    if (document.visibilityState === 'visible') fetchPoints();
+                };
+                fetchPoints();
+                const interval = setInterval(refreshVisiblePoints, 30000);
+                document.addEventListener('visibilitychange', refreshVisiblePoints);
+                return () => {
+                    isMounted = false;
+                    clearInterval(interval);
+                    document.removeEventListener('visibilitychange', refreshVisiblePoints);
+                };
             }, [shortUid]);
 
             useEffect(() => {
@@ -1008,9 +1016,16 @@
             };
 
             useEffect(() => {
+                const refreshVisibleQuota = () => {
+                    if (document.visibilityState === 'visible') loadShopQuota();
+                };
                 loadShopQuota();
-                const quotaInterval = setInterval(loadShopQuota, 15000);
-                return () => clearInterval(quotaInterval);
+                const quotaInterval = setInterval(refreshVisibleQuota, 60000);
+                document.addEventListener('visibilitychange', refreshVisibleQuota);
+                return () => {
+                    clearInterval(quotaInterval);
+                    document.removeEventListener('visibilitychange', refreshVisibleQuota);
+                };
             }, [userProfile?.userId]);
 
             const getCooldownKey = (uid) => `taiping-stamp:point-cooldown:${userProfile?.userId || activeShop.id}:${uid}`;
