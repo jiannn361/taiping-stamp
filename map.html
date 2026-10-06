@@ -18,6 +18,10 @@
         .shop-popup { min-width: 150px; }
         .shop-popup strong { display: block; font-size: 15px; margin-bottom: 4px; color: #0f172a; }
         .shop-popup span { color: #64748b; font-size: 12px; }
+        .shop-marker { background: none !important; border: none !important; }
+        .shop-marker-bubble { transform-origin: 50% 50%; transition: transform 160ms ease, box-shadow 160ms ease; will-change: transform; }
+        .shop-marker:hover .shop-marker-bubble,
+        .shop-marker.marker-active .shop-marker-bubble { transform: translateY(-4px) scale(1.12); box-shadow: 0 7px 16px rgba(15,23,42,.3) !important; }
     </style>
 </head>
 <body>
@@ -72,11 +76,28 @@
                         className: 'shop-marker',
                         iconSize: [42, 42],
                         iconAnchor: [21, 21],
-                        html: `<div style="width:42px;height:42px;border-radius:50%;background:#fff;border:4px solid ${color};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(15,23,42,.22);font-size:20px">${emoji}</div>`
+                        html: `<div class="shop-marker-bubble" style="width:42px;height:42px;border-radius:50%;background:#fff;border:4px solid ${color};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(15,23,42,.22);font-size:20px">${emoji}</div>`
                     });
                     const details = [shop.address, shop.services].filter(Boolean).map(escapeHtml).join('<br>');
                     const marker = L.marker([lat, lng], { icon }).bindPopup(`<div class="shop-popup"><strong>${escapeHtml(shop.name)}</strong><span>${details || '合作店家'}</span></div>`);
                     markers.addLayer(marker);
+                    const setMarkerActive = active => {
+                        const element = marker.getElement();
+                        if (element) element.classList.toggle('marker-active', active);
+                        marker.setZIndexOffset(active ? 1000 : 0);
+                    };
+                    marker.on('mouseover', () => setMarkerActive(true));
+                    marker.on('mouseout', () => setMarkerActive(false));
+                    marker.on('click', () => {
+                        setMarkerActive(true);
+                        setTimeout(() => setMarkerActive(false), 260);
+                    });
+                    const markerElement = marker.getElement();
+                    if (markerElement) {
+                        markerElement.addEventListener('pointerdown', () => setMarkerActive(true));
+                        markerElement.addEventListener('pointerup', () => setTimeout(() => setMarkerActive(false), 220));
+                        markerElement.addEventListener('pointercancel', () => setMarkerActive(false));
+                    }
                     bounds.push([lat, lng]);
                 });
                 if (bounds.length) {
